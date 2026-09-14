@@ -6,7 +6,7 @@
   "scripts": {
     "dev": "tsx watch src/index.ts",
     "build": "tsc --outDir dist",
-    "postinstall": "chmod +x node_modules/@prisma/engines/* 2>/dev/null || true && npx prisma generate && npx prisma db push && npm run build",
+    "postinstall": "chmod +x node_modules/@prisma/engines/* 2>/dev/null || true && npx prisma generate && npx prisma db push && npm run build && npm run prisma:seed",
     "start": "node dist/index.js",
     "lint": "eslint src --ext .ts",
     "lint:fix": "eslint src --ext .ts --fix",
