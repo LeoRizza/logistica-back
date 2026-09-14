@@ -20,8 +20,8 @@ const startServer = async (): Promise<void> => {
     configureServer(app);
 
     // Verificar conexión con la base de datos
-    await prisma.$queryRaw`SELECT 1`;
-    console.info('✓ Database connection successful');
+    //await prisma.$queryRaw`SELECT 1`;
+    //console.info('✓ Database connection successful');
 
     // Registrar rutas de API
     /*app.use(`/api/${API_VERSION}`, apiRoutes);*/
