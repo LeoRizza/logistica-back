@@ -5,7 +5,7 @@ import { AuthenticatedRequest, AppError, ErrorHandler, ErrorResponse } from '../
  * Middleware global para manejo de errores
  * Debe ser el último middleware registrado
  */
-export const errorHandler: ErrorHandler = (err, req: AuthenticatedRequest, res: Response, next: NextFunction): void => {
+export const errorHandler: ErrorHandler = (err, req: AuthenticatedRequest, res: Response, _next: NextFunction): void => {
   console.error('Error:', err);
 
   let statusCode = 500;
