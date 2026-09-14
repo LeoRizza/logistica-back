@@ -6,7 +6,7 @@
   "scripts": {
     "dev": "tsx watch src/index.ts",
     "build": "tsc",
-    "postinstall": "chmod +x node_modules/@prisma/engines/* && npx prisma db push && npx prisma generate && tsc",
+    "postinstall": "chmod +x node_modules/@prisma/engines/* 2>/dev/null || true && npx prisma generate && npx prisma db push && tsc",
     "start": "node dist/index.js",
     "lint": "eslint src --ext .ts",
     "lint:fix": "eslint src --ext .ts --fix",
@@ -54,6 +54,6 @@
     "prisma": "^5.22.0",
     "ts-node": "^10.9.2",
     "tsx": "^4.23.1",
-    "typescript": "^7.0.2"
+    "typescript": "^5.9.3"
   }
 }
