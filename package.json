@@ -44,6 +44,7 @@
     "jsonwebtoken": "^8.5.1",
     "prisma": "^5.22.0",
     "react-router-dom": "^7.18.1",
+    "tsx": "^4.23.1",
     "typescript": "^5.9.3"
   },
   "devDependencies": {
