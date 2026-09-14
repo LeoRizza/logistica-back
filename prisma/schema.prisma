@@ -1,0 +1,384 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "mysql"
+  url      = env("DATABASE_URL")
+}
+
+// Enums
+enum UserRole {
+  ADMIN
+  MANAGER
+  DISPATCHER
+  DRIVER
+  ACCOUNTANT
+}
+
+enum DriverType {
+  PROPIO
+  CONTRATADO
+}
+
+enum VehicleStatus {
+  ACTIVE
+  INACTIVE
+  MAINTENANCE
+  RETIRED
+}
+
+enum TripExpenseCategory {
+  FUEL
+  TOLL
+  MAINTENANCE
+  ACCOMMODATION
+  MEALS
+  OTHER
+}
+
+enum PaymentStatus {
+  PENDING
+  PARTIAL
+  PAID
+  CANCELLED
+}
+
+enum PaymentMethod {
+  CASH
+  TRANSFER
+  CHECK
+  CREDIT
+}
+
+// Models
+model User {
+  id        String   @id @default(cuid())
+  name      String
+  email     String   @unique
+  password_hash String
+  role      UserRole @default(DISPATCHER)
+  
+  // Timestamps
+  created_at DateTime @default(now())
+  updated_at DateTime @updatedAt
+  deleted_at DateTime?
+
+  // Relations
+  drivers         Driver[]
+  expenses        CompanyExpense[]
+  trips           Trip[]
+  tripExpenses    TripExpense[]
+  fuelLogs        FuelLog[]
+  settlements     Settlement[]
+  clients         Client[]
+
+  @@index([email])
+  @@index([role])
+  @@map("users")
+}
+
+model Driver {
+  id               String     @id @default(cuid())
+  full_name        String
+  type             DriverType @default(CONTRATADO)
+  license_exp_date DateTime
+  is_active        Boolean    @default(true)
+  license_number   String     @unique
+  phone            String?
+  cuit_cuil        String?    @unique
+  
+  // Timestamps
+  created_at       DateTime   @default(now())
+  updated_at       DateTime   @updatedAt
+  deleted_at       DateTime?
+
+  // Relations
+  user_id          String
+  user             User       @relation(fields: [user_id], references: [id], onDelete: Cascade)
+  vehicles         DriverVehicle[]
+  trips            Trip[]
+
+  @@index([user_id])
+  @@index([is_active])
+  @@index([type])
+  @@index([license_exp_date])
+  @@map("drivers")
+}
+
+model Vehicle {
+  id                      String        @id @default(cuid())
+  plate                   String        @unique
+  is_owned                Boolean       @default(true)
+  truck_rto_exp_date      DateTime?
+  trailer_plate           String?       @unique
+  trailer_rto_exp_date    DateTime?
+  truck_insurance_exp_date DateTime?
+  trailer_insurance_exp_date DateTime?
+  is_active               Boolean       @default(true)
+  vehicle_type            String        // e.g., "Truck", "Trailer", "Van"
+  brand                   String?
+  model                   String?
+  year                    Int?
+  capacity_tons           Float?        // Capacidad en toneladas
+  capacity_m3             Float?        // Capacidad en metros cúbicos
+  registration_number     String?       @unique
+  
+  // Timestamps
+  created_at            DateTime      @default(now())
+  updated_at            DateTime      @updatedAt
+  deleted_at            DateTime?
+
+  // Relations
+  drivers               DriverVehicle[]
+  trips                 Trip[]
+  fuelLogs              FuelLog[]
+
+  @@index([plate])
+  @@index([is_active])
+  @@index([truck_rto_exp_date])
+  @@index([trailer_rto_exp_date])
+  @@index([truck_insurance_exp_date])
+  @@index([trailer_insurance_exp_date])
+  @@map("vehicles")
+}
+
+model DriverVehicle {
+  id        String   @id @default(cuid())
+  
+  // Timestamps
+  created_at DateTime @default(now())
+  updated_at DateTime @updatedAt
+
+  // Relations
+  driver_id String
+  driver    Driver   @relation(fields: [driver_id], references: [id], onDelete: Cascade)
+  
+  vehicle_id String
+  vehicle    Vehicle @relation(fields: [vehicle_id], references: [id], onDelete: Cascade)
+
+  @@unique([driver_id, vehicle_id])
+  @@index([driver_id])
+  @@index([vehicle_id])
+  @@map("driver_vehicles")
+}
+
+model Trip {
+  id                String   @id @default(cuid())
+  reference_number  String   @unique
+  origin            String
+  destination       String
+  status            String   @default("PENDING") // PENDING, IN_PROGRESS, COMPLETED, CANCELLED
+  scheduled_date    DateTime
+  actual_start_date DateTime?
+  actual_end_date   DateTime?
+  distance_km       Float?
+  km_start          Float?
+  km_end            Float?
+  estimated_cost    Float
+  actual_cost       Float?
+  per_diems_delivered Float @default(0)
+  load_description  String?
+  load_weight_tons  Float?
+  load_volume_m3    Float?
+  loaded_weight_kg  Float?
+  net_weight_kg     Float?
+  rate_per_kg       Float?
+  invoice_number    String?
+  notes             String?
+
+  // Timestamps
+  created_at        DateTime @default(now())
+  updated_at        DateTime @updatedAt
+  deleted_at        DateTime?
+
+  // Relations
+  driver_id         String
+  driver            Driver   @relation(fields: [driver_id], references: [id], onDelete: Restrict)
+  
+  vehicle_id        String
+  vehicle           Vehicle  @relation(fields: [vehicle_id], references: [id], onDelete: Restrict)
+  
+  client_id         String?
+  client            Client?  @relation(fields: [client_id], references: [id], onDelete: Restrict)
+  
+  created_by_id     String
+  created_by        User     @relation(fields: [created_by_id], references: [id], onDelete: Restrict)
+
+  tripExpenses      TripExpense[]
+  fuelLogs          FuelLog[]
+
+  @@index([driver_id])
+  @@index([vehicle_id])
+  @@index([client_id])
+  @@index([created_by_id])
+  @@index([status])
+  @@index([scheduled_date])
+  @@map("trips")
+}
+
+model CompanyExpense {
+  id                String   @id @default(cuid())
+  name              String
+  description       String?
+  category          String   // e.g., "SALARIES", "FUEL", "MAINTENANCE", "INSURANCE", "RENT"
+  amount            Float
+  currency          String   @default("USD")
+  expense_date      DateTime @default(now())
+  due_date          DateTime?
+  is_recurring       Boolean  @default(false)
+  recurrence_period String?  // MONTHLY, QUARTERLY, ANNUALLY
+  payment_status    String   @default("PENDING") // PENDING, PARTIAL, PAID, CANCELLED
+  payment_date      DateTime?
+  invoice_number    String?  @unique
+  notes             String?
+
+  // Timestamps
+  created_at        DateTime @default(now())
+  updated_at        DateTime @updatedAt
+  deleted_at        DateTime?
+
+  // Relations
+  created_by_id     String
+  created_by        User     @relation(fields: [created_by_id], references: [id], onDelete: Restrict)
+
+  @@index([created_by_id])
+  @@index([category])
+  @@index([payment_status])
+  @@index([is_recurring])
+  @@index([expense_date])
+  @@map("company_expenses")
+}
+
+model FuelLog {
+  id                    String   @id @default(cuid())
+  liters_loaded         Float    // Litros cargados en esta operación
+  liters_per_km         Float?   // Promedio de consumo calculado desde la última carga
+  previous_fuel_log_id  String?  @unique // Referencia al registro anterior de combustible
+  previous_fuel_log     FuelLog? @relation("FuelLogChain", fields: [previous_fuel_log_id], references: [id], onDelete: SetNull)
+  next_fuel_log         FuelLog? @relation("FuelLogChain")
+  distance_km           Float?   // Kilómetros recorridos desde la última carga
+  fuel_price_per_liter  Float
+  total_cost            Float    // liters_loaded * fuel_price_per_liter
+  odometer_reading      Float    // Lectura del odómetro en el momento de carga
+  fuel_type             String   @default("DIESEL") // DIESEL, GASOLINE, LPG
+  station_name          String?
+  location              String?
+  notes                 String?
+
+  // Timestamps
+  created_at            DateTime @default(now())
+  updated_at            DateTime @updatedAt
+  deleted_at            DateTime?
+
+  // Relations
+  vehicle_id            String
+  vehicle               Vehicle  @relation(fields: [vehicle_id], references: [id], onDelete: Restrict)
+
+  trip_id               String?
+  trip                  Trip?    @relation(fields: [trip_id], references: [id], onDelete: SetNull)
+
+  created_by_id         String
+  created_by            User     @relation(fields: [created_by_id], references: [id], onDelete: Restrict)
+
+  @@index([vehicle_id])
+  @@index([created_by_id])
+  @@index([trip_id])
+  @@index([fuel_type])
+  @@index([created_at])
+  @@index([previous_fuel_log_id])
+  @@map("fuel_logs")
+}
+
+model TripExpense {
+  id                  String                @id @default(cuid())
+  category            TripExpenseCategory
+  amount              Float
+  currency            String                @default("USD")
+  description         String?
+  receipt_number      String?
+  notes               String?
+  payment_status      PaymentStatus         @default(PENDING)
+  payment_date        DateTime?
+
+  // Timestamps
+  created_at          DateTime              @default(now())
+  updated_at          DateTime              @updatedAt
+  deleted_at          DateTime?
+
+  // Relations
+  trip_id             String
+  trip                Trip                  @relation(fields: [trip_id], references: [id], onDelete: Cascade)
+
+  created_by_id       String
+  created_by          User                  @relation(fields: [created_by_id], references: [id], onDelete: Restrict)
+
+  @@index([trip_id])
+  @@index([created_by_id])
+  @@index([category])
+  @@index([payment_status])
+  @@index([created_at])
+  @@map("trip_expenses")
+}
+
+model Settlement {
+  id                          String         @id @default(cuid())
+  driver_id                   String
+  driver_name                 String
+  start_date                  DateTime
+  end_date                    DateTime
+  total_amount_earned         Float
+  total_per_diems_delivered   Float
+  total_unforesee_expenses    Float
+  total_to_pay                Float
+  total_deductions            Float
+  extra_discounts             Float          @default(0)
+  bonifications               Float          @default(0)
+  final_amount                Float
+  payment_method              PaymentMethod  @default(CASH)
+  notes                       String?
+  is_paid                     Boolean        @default(false)
+  payment_date                DateTime?
+
+  created_at                  DateTime       @default(now())
+  updated_at                  DateTime       @updatedAt
+  deleted_at                  DateTime?
+
+  created_by_id               String
+  created_by                  User           @relation(fields: [created_by_id], references: [id], onDelete: Restrict)
+
+  @@index([driver_id])
+  @@index([created_by_id])
+  @@index([is_paid])
+  @@index([created_at])
+  @@index([start_date])
+  @@map("settlements")
+}
+
+model Client {
+  id              String   @id @default(cuid())
+  business_name   String
+  contact_email   String?
+  contact_phone   String?
+  contact_name    String?
+  city            String?
+  extra_data      Json?
+
+  // Timestamps
+  created_at      DateTime @default(now())
+  updated_at      DateTime @updatedAt
+  deleted_at      DateTime?
+
+  // Relations
+  created_by_id   String
+  created_by      User     @relation(fields: [created_by_id], references: [id], onDelete: Restrict)
+  trips           Trip[]
+
+  @@index([created_by_id])
+  @@index([business_name])
+  @@index([contact_email])
+  @@map("clients")
+}

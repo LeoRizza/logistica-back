@@ -1,0 +1,36 @@
+import { PrismaClient } from '@prisma/client';
+
+let prismaInstance: PrismaClient;
+
+/**
+ * Obtiene una instancia de Prisma Client (singleton pattern)
+ * Esto evita crear múltiples instancias en desarrollo con hot reload
+ */
+export const getPrismaClient = (): PrismaClient => {
+  if (!prismaInstance) {
+    prismaInstance = new PrismaClient({
+      log:
+        process.env.NODE_ENV === 'development'
+          ? ['query', 'error', 'warn', 'info']
+          : ['error'],
+    });
+  }
+  return prismaInstance;
+};
+
+/**
+ * Desconecta la base de datos
+ */
+export const disconnectDatabase = async (): Promise<void> => {
+  if (prismaInstance) {
+    await prismaInstance.$disconnect();
+  }
+};
+
+/**
+ * Exporta la instancia de Prisma
+ */
+export const prisma = getPrismaClient();
+
+export default prisma;
+
