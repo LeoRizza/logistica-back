@@ -21,14 +21,26 @@ export const configureServer = (app: Express): void => {
 
   app.use(cors({
     origin: function (origin, callback) {
-      // Permitimos peticiones sin origen (ej. Postman, cURL) o las que estén en la lista blanca
-      if (!origin || allowedOrigins.includes(origin)) {
-        callback(null, true);
+      // 1. Logueamos exactamente qué está pidiendo acceso
+      console.log(`[CORS DEBUG] Origin entrante: '${origin}'`);
+
+      // 2. Logueamos cómo quedó armado el array final en el servidor
+      console.log(`[CORS DEBUG] Lista de orígenes permitidos:`, allowedOrigins);
+
+      if (!origin) {
+        console.log('[CORS DEBUG] Petición sin origin (Postman/cURL). Permitido.');
+        return callback(null, true);
+      }
+
+      if (allowedOrigins.includes(origin)) {
+        console.log(`[CORS DEBUG] Match exitoso para: '${origin}'. Permitido.`);
+        return callback(null, true);
       } else {
-        callback(new Error('CORS not allowed for this origin'));
+        console.error(`[CORS DEBUG] ERROR FATAL: El origin '${origin}' fue rechazado porque no coincide exactamente con los orígenes permitidos.`);
+        return callback(new Error('CORS not allowed for this origin'));
       }
     },
-    credentials: true, // Importante si después manejás cookies o sesiones
+    credentials: true,
     methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
     allowedHeaders: ['Content-Type', 'Authorization']
   }));
