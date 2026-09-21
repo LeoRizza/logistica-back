@@ -15,8 +15,9 @@ export const configureServer = (app: Express): void => {
     'http://localhost:3000',
     'http://localhost:3001', // <-- El puerto actual de tu frontend
     'http://localhost:5173', // <-- Por si en el futuro migramos a Vite
-    process.env.FRONTEND_URL // <-- Para cuando lo subas a producción
-  ].filter(Boolean); // Filtramos undefined
+    (process.env.FRONTEND_URL || '').trim(), // Limpia espacios y saltos de línea de Hostinger
+    'https://logistica-front-steel.vercel.app' // Fallback duro de seguridad
+  ].filter(Boolean); // Filtramos undefined o strings vacíos
 
   app.use(cors({
     origin: function (origin, callback) {
