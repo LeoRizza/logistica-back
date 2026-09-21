@@ -3,23 +3,30 @@ import { PrismaClient } from '@prisma/client';
 let prismaInstance: PrismaClient;
 
 /**
- * Obtiene una instancia de Prisma Client (singleton pattern)
- * Esto evita crear múltiples instancias en desarrollo con hot reload
+ * Proxy que intercepta los llamados a Prisma para garantizar
+ * que la instanciación ocurra estrictamente Post-Fork en Hostinger.
  */
-export const getPrismaClient = (): PrismaClient => {
-  if (!prismaInstance) {
-    prismaInstance = new PrismaClient({
-      log:
-        process.env.NODE_ENV === 'development'
-          ? ['query', 'error', 'warn', 'info']
-          : ['error'],
-    });
+export const prisma = new Proxy({} as PrismaClient, {
+  get: (_target, prop: keyof PrismaClient) => {
+    // Si no existe la instancia, la creamos acá (Lazy Load seguro)
+    if (!prismaInstance) {
+      prismaInstance = new PrismaClient({
+        log:
+          process.env.NODE_ENV === 'development'
+            ? ['query', 'error', 'warn', 'info']
+            : ['error'],
+      });
+      console.log('Instancia de Prisma creada de forma segura (Post-Fork)');
+    }
+
+    // Devolvemos la propiedad asegurando el contexto
+    const value = prismaInstance[prop];
+    return typeof value === 'function' ? value.bind(prismaInstance) : value;
   }
-  return prismaInstance;
-};
+});
 
 /**
- * Desconecta la base de datos
+ * Desconecta la base de datos durante el apagado del servidor
  */
 export const disconnectDatabase = async (): Promise<void> => {
   if (prismaInstance) {
@@ -27,10 +34,4 @@ export const disconnectDatabase = async (): Promise<void> => {
   }
 };
 
-/**
- * Exporta la instancia de Prisma
- */
-export const prisma = getPrismaClient();
-
 export default prisma;
-
