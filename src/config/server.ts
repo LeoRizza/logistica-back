@@ -1,4 +1,4 @@
-import express, { Express, Request, Response, NextFunction } from 'express';
+import express, { Express, Request, Response } from 'express';
 import cors from 'cors';
 import { errorHandler } from '../middleware/errorHandler';
 import { requestLogger } from '../middleware/requestLogger';
@@ -10,53 +10,17 @@ import apiRoutes from '../routes/index';
  * @param app - Instancia de Express
  */
 export const configureServer = (app: Express): void => {
-  // 1. MIDDLEWARE DE AUDITORÍA DE REDIRECCIONES (Antes que cualquier otra cosa)
-  app.use((req: Request, res: Response, next: NextFunction) => {
-    const startTime = Date.now();
-    console.log(`[REQ IN] ${req.method} ${req.originalUrl}`);
-
-    res.on('finish', () => {
-      const duration = Date.now() - startTime;
-      if (res.statusCode === 307 || res.statusCode === 301 || res.statusCode === 302) {
-        console.error(`[ALERTA REDIRECT] Status: ${res.statusCode} | Método: ${req.method} | Endpoint: ${req.originalUrl} | Destino (Location): ${res.getHeader('Location')} | Tiempo: ${duration}ms`);
-      } else {
-        // Podés comentar esta línea si te ensucia mucho el log, pero sirve para confirmar que pasa el request
-        console.log(`[REQ OUT] ${req.method} ${req.originalUrl} - Status: ${res.statusCode} - ${duration}ms`);
-      }
-    });
-
-    next();
-  });
   // CORS Configuration - Strict mode
   const allowedOrigins = [
     'http://localhost:3000',
-    'http://localhost:3001', // <-- El puerto actual de tu frontend
-    'http://localhost:5173', // <-- Por si en el futuro migramos a Vite
-    (process.env.FRONTEND_URL || '').trim(), // Limpia espacios y saltos de línea de Hostinger
-    'https://logistica-front-steel.vercel.app' // Fallback duro de seguridad
-  ].filter(Boolean); // Filtramos undefined o strings vacíos
+    'http://localhost:3001',
+    'http://localhost:5173',
+    (process.env.FRONTEND_URL || '').trim(),
+    'https://logistica-front-steel.vercel.app'
+  ].filter(Boolean);
 
   app.use(cors({
-    origin: function (origin, callback) {
-      // 1. Logueamos exactamente qué está pidiendo acceso
-      console.log(`[CORS DEBUG] Origin entrante: '${origin}'`);
-
-      // 2. Logueamos cómo quedó armado el array final en el servidor
-      console.log(`[CORS DEBUG] Lista de orígenes permitidos:`, allowedOrigins);
-
-      if (!origin) {
-        console.log('[CORS DEBUG] Petición sin origin (Postman/cURL). Permitido.');
-        return callback(null, true);
-      }
-
-      if (allowedOrigins.includes(origin)) {
-        console.log(`[CORS DEBUG] Match exitoso para: '${origin}'. Permitido.`);
-        return callback(null, true);
-      } else {
-        console.error(`[CORS DEBUG] ERROR FATAL: El origin '${origin}' fue rechazado porque no coincide exactamente con los orígenes permitidos.`);
-        return callback(new Error('CORS not allowed for this origin'));
-      }
-    },
+    origin: allowedOrigins,
     credentials: true,
     methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
     allowedHeaders: ['Content-Type', 'Authorization']
@@ -93,13 +57,12 @@ export const configureServer = (app: Express): void => {
     res.status(200).json(response);
   });
 
-  // Registrar rutas de API (ESTO DEBE IR ESTRICTAMENTE ANTES DEL 404)
+  // Registrar rutas de API
   const API_VERSION = process.env.API_VERSION || 'v1';
   app.use(`/api/${API_VERSION}`, apiRoutes);
 
   // 404 Handler
   app.use((_req: Request, res: Response): void => {
-
     res.status(404).json({
       success: false,
       message: 'Route not found',
@@ -109,9 +72,8 @@ export const configureServer = (app: Express): void => {
     });
   });
 
-  // Global Error Handler (debe estar al final)
+  // Global Error Handler
   app.use(errorHandler);
 };
 
 export default configureServer;
-
