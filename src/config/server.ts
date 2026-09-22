@@ -6,8 +6,8 @@ import { ApiResponse } from '../types/index';
 import apiRoutes from '../routes/index';
 
 export const configureServer = (app: Express): void => {
-  // 1. Logger de solicitudes global (ANTES DE CORS para poder auditar el OPTIONS)
-  app.use((req: Request, res: Response, next: NextFunction) => {
+// 1. Logger de solicitudes global (ANTES DE CORS para poder auditar el OPTIONS)
+  app.use((req: Request, _res: Response, next: NextFunction) => {
     console.log(`[REQ IN] ${req.method} ${req.originalUrl} - Origin: ${req.headers.origin || 'Ninguno'}`);
     next();
   });
