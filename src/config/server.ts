@@ -10,6 +10,23 @@ import apiRoutes from '../routes/index';
  * @param app - Instancia de Express
  */
 export const configureServer = (app: Express): void => {
+  // 1. MIDDLEWARE DE AUDITORÍA DE REDIRECCIONES (Antes que cualquier otra cosa)
+  app.use((req: Request, res: Response, next: NextFunction) => {
+    const startTime = Date.now();
+    console.log(`[REQ IN] ${req.method} ${req.originalUrl}`);
+
+    res.on('finish', () => {
+      const duration = Date.now() - startTime;
+      if (res.statusCode === 307 || res.statusCode === 301 || res.statusCode === 302) {
+        console.error(`[ALERTA REDIRECT] Status: ${res.statusCode} | Método: ${req.method} | Endpoint: ${req.originalUrl} | Destino (Location): ${res.getHeader('Location')} | Tiempo: ${duration}ms`);
+      } else {
+        // Podés comentar esta línea si te ensucia mucho el log, pero sirve para confirmar que pasa el request
+        console.log(`[REQ OUT] ${req.method} ${req.originalUrl} - Status: ${res.statusCode} - ${duration}ms`);
+      }
+    });
+
+    next();
+  });
   // CORS Configuration - Strict mode
   const allowedOrigins = [
     'http://localhost:3000',
