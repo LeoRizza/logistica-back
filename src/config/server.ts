@@ -1,16 +1,18 @@
-import express, { Express, Request, Response } from 'express';
+import express, { Express, Request, Response, NextFunction } from 'express';
 import cors from 'cors';
 import { errorHandler } from '../middleware/errorHandler';
 import { requestLogger } from '../middleware/requestLogger';
 import { ApiResponse } from '../types/index';
 import apiRoutes from '../routes/index';
 
-/**
- * Configura la instancia de Express con middleware global
- * @param app - Instancia de Express
- */
 export const configureServer = (app: Express): void => {
-  // CORS Configuration - Strict mode
+  // 1. Logger de solicitudes global (ANTES DE CORS para poder auditar el OPTIONS)
+  app.use((req: Request, res: Response, next: NextFunction) => {
+    console.log(`[REQ IN] ${req.method} ${req.originalUrl} - Origin: ${req.headers.origin || 'Ninguno'}`);
+    next();
+  });
+
+  // 2. CORS Configuration - Flexible y seguro
   const allowedOrigins = [
     'http://localhost:3000',
     'http://localhost:3001',
@@ -20,10 +22,18 @@ export const configureServer = (app: Express): void => {
   ].filter(Boolean);
 
   app.use(cors({
-    origin: allowedOrigins,
+    origin: function (origin, callback) {
+      // Permitimos peticiones locales/backend (sin origen) o si el origen está en la lista
+      if (!origin || allowedOrigins.includes(origin)) {
+        return callback(null, true);
+      }
+      console.error(`[CORS RECHAZADO] Origen no permitido: ${origin}`);
+      return callback(null, false);
+    },
     credentials: true,
     methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
-    allowedHeaders: ['Content-Type', 'Authorization']
+    // Al omitir 'allowedHeaders', la librería automáticamente refleja y permite
+    // cualquier header que el frontend pida en el Access-Control-Request-Headers.
   }));
 
   // Middleware para parsear JSON y URL-encoded data
