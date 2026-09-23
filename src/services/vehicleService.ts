@@ -60,7 +60,7 @@ export class VehicleService extends BaseService {
 
       const vehicle = await this.prisma.vehicle.create({
         data: {
-          plate: vehicleData.plate,
+          plate: vehicleData.plate.trim(),
           vehicle_type: vehicleData.vehicle_type,
           brand: vehicleData.brand,
           model: vehicleData.model,
@@ -69,11 +69,13 @@ export class VehicleService extends BaseService {
           capacity_m3: vehicleData.capacity_m3,
           is_owned: vehicleData.is_owned ?? true,
           truck_rto_exp_date: vehicleData.truck_rto_exp_date,
-          trailer_plate: vehicleData.trailer_plate,
+          // Sanitización: si viene vacío, pasa a null
+          trailer_plate: vehicleData.trailer_plate?.trim() || null,
           trailer_rto_exp_date: vehicleData.trailer_rto_exp_date,
           truck_insurance_exp_date: vehicleData.truck_insurance_exp_date,
           trailer_insurance_exp_date: vehicleData.trailer_insurance_exp_date,
-          registration_number: vehicleData.registration_number,
+          // Sanitización: si viene vacío, pasa a null
+          registration_number: vehicleData.registration_number?.trim() || null,
           is_active: true,
         },
       });
@@ -165,7 +167,7 @@ export class VehicleService extends BaseService {
       const vehicle = await this.prisma.vehicle.update({
         where: { id },
         data: {
-          ...(vehicleData.plate && { plate: vehicleData.plate }),
+          ...(vehicleData.plate && { plate: vehicleData.plate.trim() }),
           ...(vehicleData.vehicle_type && { vehicle_type: vehicleData.vehicle_type }),
           ...(vehicleData.brand !== undefined && { brand: vehicleData.brand }),
           ...(vehicleData.model !== undefined && { model: vehicleData.model }),
@@ -175,11 +177,13 @@ export class VehicleService extends BaseService {
           ...(vehicleData.is_owned !== undefined && { is_owned: vehicleData.is_owned }),
           ...(vehicleData.is_active !== undefined && { is_active: vehicleData.is_active }),
           ...(vehicleData.truck_rto_exp_date !== undefined && { truck_rto_exp_date: vehicleData.truck_rto_exp_date }),
-          ...(vehicleData.trailer_plate !== undefined && { trailer_plate: vehicleData.trailer_plate }),
+          // Sanitización en update
+          ...(vehicleData.trailer_plate !== undefined && { trailer_plate: vehicleData.trailer_plate?.trim() || null }),
           ...(vehicleData.trailer_rto_exp_date !== undefined && { trailer_rto_exp_date: vehicleData.trailer_rto_exp_date }),
           ...(vehicleData.truck_insurance_exp_date !== undefined && { truck_insurance_exp_date: vehicleData.truck_insurance_exp_date }),
           ...(vehicleData.trailer_insurance_exp_date !== undefined && { trailer_insurance_exp_date: vehicleData.trailer_insurance_exp_date }),
-          ...(vehicleData.registration_number !== undefined && { registration_number: vehicleData.registration_number }),
+          // Sanitización en update
+          ...(vehicleData.registration_number !== undefined && { registration_number: vehicleData.registration_number?.trim() || null }),
         },
       });
 
