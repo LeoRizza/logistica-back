@@ -10,17 +10,17 @@ interface SettlementPreview {
   trip_count: number;
   trips: Array<{
     id: string;
-    reference_number: string;
-    origin: string;
-    destination: string;
-    distance_km: number | null;
-    estimated_cost: number;
-    status: string;
-    scheduled_date: Date;
-    actual_start_date: Date | null;
-    actual_end_date: Date | null;
-    load_description: string | null;
-    load_weight_tons: number | null;
+    reference_number?: string | null;
+    origin?: string | null;
+    destination?: string | null;
+    distance_km?: number | null;
+    estimated_cost?: number | null;
+    status?: string | null;
+    scheduled_date?: Date | null;
+    actual_start_date?: Date | null;
+    actual_end_date?: Date | null;
+    load_description?: string | null;
+    load_weight_tons?: number | null;
   }>;
 }
 
@@ -34,46 +34,49 @@ interface UnforeseeExpense {
 }
 
 interface CreateTripInput {
-  reference_number: string;
-  origin: string;
-  destination: string;
-  driver_id: string;
-  vehicle_id: string;
-  client_id?: string;
-  scheduled_date: Date;
-  distance_km?: number;
-  km_start?: number;
-  km_end?: number;
-  estimated_cost: number;
-  per_diems_delivered?: number;
-  load_description?: string;
-  load_weight_tons?: number;
-  load_volume_m3?: number;
-  loaded_weight_kg?: number;
-  net_weight_kg?: number;
-  rate_per_kg?: number;
-  invoice_number?: string;
-  status?: string;
-  notes?: string;
+  reference_number?: string | null;
+  ctg?: string | null;
+  origin?: string | null;
+  destination?: string | null;
+  driver_id?: string | null;
+  vehicle_id?: string | null;
+  client_id?: string | null;
+  scheduled_date?: Date | null;
+  distance_km?: number | null;
+  km_start?: number | null;
+  km_end?: number | null;
+  estimated_cost?: number | null;
+  per_diems_delivered?: number | null;
+  load_description?: string | null;
+  load_weight_tons?: number | null;
+  load_volume_m3?: number | null;
+  loaded_weight_kg?: number | null;
+  net_weight_kg?: number | null;
+  rate_per_kg?: number | null;
+  invoice_number?: string | null;
+  status?: string | null;
+  notes?: string | null;
   unforesee_expenses?: UnforeseeExpense[];
   created_by_id: string;
 }
 
 interface UpdateTripInput {
-  origin?: string;
-  destination?: string;
-  driver_id?: string;
-  vehicle_id?: string;
+  reference_number?: string | null;
+  ctg?: string | null;
+  origin?: string | null;
+  destination?: string | null;
+  driver_id?: string | null;
+  vehicle_id?: string | null;
   client_id?: string | null;
-  scheduled_date?: Date;
+  scheduled_date?: Date | null;
   actual_start_date?: Date | null;
   actual_end_date?: Date | null;
   distance_km?: number | null;
   km_start?: number | null;
   km_end?: number | null;
-  estimated_cost?: number;
+  estimated_cost?: number | null;
   actual_cost?: number | null;
-  per_diems_delivered?: number;
+  per_diems_delivered?: number | null;
   load_description?: string | null;
   load_weight_tons?: number | null;
   load_volume_m3?: number | null;
@@ -83,67 +86,111 @@ interface UpdateTripInput {
   invoice_number?: string | null;
   notes?: string | null;
   unforesee_expenses?: UnforeseeExpense[];
-  status?: string;
+  status?: string | null;
 }
 
 export class TripService extends BaseService {
+  /**
+   * Sanitiza strings vacíos a null para evitar problemas con unique constraints
+   */
+  private sanitizeString(value: string | null | undefined): string | null {
+    if (value === undefined) return undefined as any;
+    const trimmed = typeof value === 'string' ? value.trim() : value;
+    return trimmed === '' ? null : trimmed;
+  }
+
   async createTrip(tripData: CreateTripInput): Promise<ServiceResponse<any>> {
     try {
-      const requiredFields = ['reference_number', 'origin', 'destination', 'driver_id', 'vehicle_id', 'scheduled_date', 'estimated_cost', 'created_by_id'];
-      const missingFields = requiredFields.filter((field) => !tripData[field as keyof CreateTripInput]);
-
-      if (missingFields.length > 0) {
-        return this.createErrorResponse(`Missing required fields: ${missingFields.join(', ')}`);
+      if (!tripData.created_by_id) {
+        return this.createErrorResponse('created_by_id is required');
       }
 
-      // Verificar que el conductor existe
-      const driver = await this.prisma.driver.findUnique({
-        where: { id: tripData.driver_id },
-      });
-      if (!driver || driver.deleted_at) {
-        return this.createErrorResponse('Driver not found');
+      const sanitizedRefNum = this.sanitizeString(tripData.reference_number as string | null);
+      const sanitizedCtg = this.sanitizeString(tripData.ctg as string | null);
+      const sanitizedOrigin = this.sanitizeString(tripData.origin as string | null);
+      const sanitizedDestination = this.sanitizeString(tripData.destination as string | null);
+      const sanitizedDriverId = this.sanitizeString(tripData.driver_id as string | null);
+      const sanitizedVehicleId = this.sanitizeString(tripData.vehicle_id as string | null);
+      const sanitizedClientId = this.sanitizeString(tripData.client_id as string | null);
+      const sanitizedInvoice = this.sanitizeString(tripData.invoice_number as string | null);
+      const sanitizedLoadDesc = this.sanitizeString(tripData.load_description as string | null);
+      const sanitizedNotes = this.sanitizeString(tripData.notes as string | null);
+
+      if (sanitizedRefNum) {
+        const existingTrip = await this.prisma.trip.findUnique({
+          where: { reference_number: sanitizedRefNum },
+        });
+        if (existingTrip && !existingTrip.deleted_at) {
+          return this.createErrorResponse('Trip with this reference number already exists');
+        }
       }
 
-      // Verificar que el vehículo existe
-      const vehicle = await this.prisma.vehicle.findUnique({
-        where: { id: tripData.vehicle_id },
-      });
-      if (!vehicle || vehicle.deleted_at) {
-        return this.createErrorResponse('Vehicle not found');
+      if (sanitizedDriverId) {
+        const driver = await this.prisma.driver.findUnique({
+          where: { id: sanitizedDriverId },
+        });
+        if (!driver || driver.deleted_at) {
+          return this.createErrorResponse('Driver not found');
+        }
       }
 
-      // Verificar que el reference_number es único
-      const existingTrip = await this.prisma.trip.findUnique({
-        where: { reference_number: tripData.reference_number },
-      });
-      if (existingTrip && !existingTrip.deleted_at) {
-        return this.createErrorResponse('Trip with this reference number already exists');
+      if (sanitizedVehicleId) {
+        const vehicle = await this.prisma.vehicle.findUnique({
+          where: { id: sanitizedVehicleId },
+        });
+        if (!vehicle || vehicle.deleted_at) {
+          return this.createErrorResponse('Vehicle not found');
+        }
+      }
+
+      if (sanitizedClientId) {
+        const client = await this.prisma.client.findUnique({
+          where: { id: sanitizedClientId },
+        });
+        if (!client || client.deleted_at) {
+          return this.createErrorResponse('Client not found');
+        }
+      }
+
+      let estimatedCost = tripData.estimated_cost;
+      if (estimatedCost === undefined || estimatedCost === null) {
+        if (
+          tripData.net_weight_kg !== undefined &&
+          tripData.net_weight_kg !== null &&
+          tripData.rate_per_kg !== undefined &&
+          tripData.rate_per_kg !== null
+        ) {
+          estimatedCost = Number(tripData.net_weight_kg) * Number(tripData.rate_per_kg);
+        } else {
+          estimatedCost = null;
+        }
       }
 
       const trip = await this.prisma.trip.create({
         data: {
-          reference_number: tripData.reference_number,
-          origin: tripData.origin,
-          destination: tripData.destination,
-          driver_id: tripData.driver_id,
-          vehicle_id: tripData.vehicle_id,
-          ...(tripData.client_id && { client_id: tripData.client_id }),
-          scheduled_date: new Date(tripData.scheduled_date),
+          reference_number: sanitizedRefNum,
+          ctg: sanitizedCtg,
+          origin: sanitizedOrigin,
+          destination: sanitizedDestination,
+          driver_id: sanitizedDriverId,
+          vehicle_id: sanitizedVehicleId,
+          ...(sanitizedClientId && { client_id: sanitizedClientId }),
+          scheduled_date: tripData.scheduled_date ? new Date(tripData.scheduled_date) : null,
           distance_km: tripData.distance_km,
           km_start: tripData.km_start,
           km_end: tripData.km_end,
-          estimated_cost: tripData.estimated_cost,
-          per_diems_delivered: tripData.per_diems_delivered || 0,
-          load_description: tripData.load_description,
+          estimated_cost: estimatedCost,
+          per_diems_delivered: tripData.per_diems_delivered ?? 0,
+          load_description: sanitizedLoadDesc,
           load_weight_tons: tripData.load_weight_tons,
           load_volume_m3: tripData.load_volume_m3,
           loaded_weight_kg: tripData.loaded_weight_kg,
           net_weight_kg: tripData.net_weight_kg,
           rate_per_kg: tripData.rate_per_kg,
-          invoice_number: tripData.invoice_number,
-          notes: tripData.notes,
+          invoice_number: sanitizedInvoice,
+          notes: sanitizedNotes,
           created_by_id: tripData.created_by_id,
-          status: tripData.status || 'PENDING',
+          status: 'COMPLETED',
           ...(tripData.unforesee_expenses && tripData.unforesee_expenses.length > 0 && {
             tripExpenses: {
               create: tripData.unforesee_expenses.map((expense) => ({
@@ -170,7 +217,13 @@ export class TripService extends BaseService {
     }
   }
 
-  async getTrips(page: number = 1, limit: number = 10): Promise<ServiceResponse<any>> {
+  async getTrips(
+    page: number = 1,
+    limit: number = 10,
+    status?: string,
+    driverId?: string,
+    clientId?: string
+  ): Promise<ServiceResponse<any>> {
     try {
       const { skip, take } = this.calculatePagination(page, limit);
 

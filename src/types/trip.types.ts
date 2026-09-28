@@ -8,30 +8,31 @@ export interface UnforeseeExpense {
 }
 
 export interface CreateTripRequest {
-  date: string;
-  driver_id: string;
-  vehicle_id: string;
-  client_id?: string;
-  bill_of_lading: string;
-  estimated_km: number;
-  km_start?: number;
-  km_end?: number;
-  amount_to_pay: number;
-  per_diems_delivered: number;
-  unforesee_expenses: UnforeseeExpense[];
+  date?: string | null;
+  driver_id?: string | null;
+  vehicle_id?: string | null;
+  client_id?: string | null;
+  bill_of_lading?: string | null;
+  estimated_km?: number | null;
+  km_start?: number | null;
+  km_end?: number | null;
+  amount_to_pay?: number | null;
+  per_diems_delivered?: number | null;
+  unforesee_expenses?: UnforeseeExpense[];
   fuelLogs?: FuelLogDTO[];
   is_active?: boolean;
-  origin?: string;
-  destination?: string;
-  status?: string;
-  loaded_weight_kg?: number;
-  net_weight_kg?: number;
-  rate_per_kg?: number;
-  load_description?: string;
-  load_weight_tons?: number;
-  load_volume_m3?: number;
-  invoice_number?: string;
-  notes?: string;
+  origin?: string | null;
+  destination?: string | null;
+  status?: string | null;
+  loaded_weight_kg?: number | null;
+  net_weight_kg?: number | null;
+  rate_per_kg?: number | null;
+  load_description?: string | null;
+  load_weight_tons?: number | null;
+  load_volume_m3?: number | null;
+  invoice_number?: string | null;
+  ctg?: string | null;
+  notes?: string | null;
 }
 
 export interface Driver {
@@ -83,17 +84,18 @@ export interface Client {
 
 export interface Trip {
   id: string;
-  reference_number: string;
-  origin: string;
-  destination: string;
-  status: string;
-  scheduled_date: Date;
+  reference_number?: string | null;
+  ctg?: string | null;
+  origin?: string | null;
+  destination?: string | null;
+  status?: string | null;
+  scheduled_date?: Date | null;
   actual_start_date?: Date | null;
   actual_end_date?: Date | null;
   distance_km?: number | null;
   km_start?: number | null;
   km_end?: number | null;
-  estimated_cost: number;
+  estimated_cost?: number | null;
   actual_cost?: number | null;
   per_diems_delivered: number;
   load_description?: string | null;
@@ -104,6 +106,9 @@ export interface Trip {
   rate_per_kg?: number | null;
   invoice_number?: string | null;
   notes?: string | null;
+  driver_id?: string | null;
+  vehicle_id?: string | null;
+  client_id?: string | null;
   created_at: Date;
   updated_at: Date;
   deleted_at?: Date | null;

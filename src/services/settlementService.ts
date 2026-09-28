@@ -55,30 +55,49 @@ class SettlementService extends BaseService {
     });
 
     // Mapear viajes a TripSummary
-    const tripSummaries: TripSummary[] = trips.map((trip) => ({
-      id: trip.id,
-      date: trip.scheduled_date.toISOString().split('T')[0],
-      reference_number: trip.reference_number,
-      estimated_cost: trip.estimated_cost,
-      actual_cost: trip.actual_cost ?? 0,
-      tripExpenses_total: trip.tripExpenses.reduce(
-        (sum, expense) => sum + expense.amount,
+    const tripSummaries: TripSummary[] = trips.map((trip) => {
+      const estimatedCost = trip.estimated_cost ?? 0;
+      const actualCost = trip.actual_cost ?? 0;
+      const perDiemsDelivered = trip.per_diems_delivered ?? 0;
+      const tripExpensesTotal = trip.tripExpenses?.reduce(
+        (sum, expense) => sum + (expense.amount ?? 0),
         0
-      ),
-      per_diems_delivered: trip.per_diems_delivered || 0,
-      distance_km: trip.distance_km ?? undefined,
-    }));
+      ) ?? 0;
+      const distanceKm = trip.distance_km ?? undefined;
+      const referenceNumber = trip.reference_number ?? '';
+      const scheduledDate = trip.scheduled_date?.toISOString().split('T')[0] ?? '';
+
+      return {
+        id: trip.id,
+        date: scheduledDate,
+        reference_number: referenceNumber,
+        estimated_cost: estimatedCost,
+        actual_cost: actualCost,
+        tripExpenses_total: tripExpensesTotal,
+        per_diems_delivered: perDiemsDelivered,
+        distance_km: distanceKm,
+      };
+    });
 
     // Calcular totales
-    const total_amount_earned = trips.reduce((sum, trip) => sum + trip.estimated_cost, 0);
+    const total_amount_earned = trips.reduce(
+      (sum, trip) => sum + (trip.estimated_cost ?? 0),
+      0
+    );
     const total_trip_expenses = trips.reduce(
       (sum, trip) =>
         sum +
-        trip.tripExpenses.reduce((expenseSum, expense) => expenseSum + expense.amount, 0),
+        (trip.tripExpenses?.reduce(
+          (expenseSum, expense) => expenseSum + (expense.amount ?? 0),
+          0
+        ) ?? 0),
       0
     );
     const total_unforesee_expenses = total_trip_expenses;
-    const total_per_diems_delivered = trips.reduce((sum, trip) => sum + (trip.per_diems_delivered || 0), 0);
+    const total_per_diems_delivered = trips.reduce(
+      (sum, trip) => sum + (trip.per_diems_delivered ?? 0),
+      0
+    );
 
     // Total de descuentos (gastos de viaje + viáticos entregados)
     const total_deductions = total_trip_expenses + total_per_diems_delivered;
@@ -88,7 +107,7 @@ class SettlementService extends BaseService {
 
     return {
       driver_id,
-      driver_name: driver.full_name,
+      driver_name: driver.full_name ?? '',
       start_date: start_date,
       end_date: end_date,
       trips: tripSummaries,
@@ -289,28 +308,35 @@ class SettlementService extends BaseService {
    * @returns SettlementDTO
    */
   private formatSettlementDTO(settlement: any): SettlementDTO {
+    const startDate = settlement.start_date
+      ? settlement.start_date.toISOString().split('T')[0]
+      : '';
+    const endDate = settlement.end_date
+      ? settlement.end_date.toISOString().split('T')[0]
+      : '';
+
     return {
-      id: settlement.id,
-      driver_id: settlement.driver_id,
-      driver_name: settlement.driver_name,
-      start_date: settlement.start_date.toISOString().split('T')[0],
-      end_date: settlement.end_date.toISOString().split('T')[0],
+      id: settlement.id ?? '',
+      driver_id: settlement.driver_id ?? '',
+      driver_name: settlement.driver_name ?? '',
+      start_date: startDate,
+      end_date: endDate,
       trips: [],
-      total_amount_earned: settlement.total_amount_earned,
-      total_per_diems_delivered: settlement.total_per_diems_delivered,
-      total_unforesee_expenses: settlement.total_unforesee_expenses,
-      total_to_pay: settlement.total_to_pay,
-      total_deductions: settlement.total_deductions,
-      extra_discounts: settlement.extra_discounts,
-      bonifications: settlement.bonifications,
-      final_amount: settlement.final_amount,
+      total_amount_earned: settlement.total_amount_earned ?? 0,
+      total_per_diems_delivered: settlement.total_per_diems_delivered ?? 0,
+      total_unforesee_expenses: settlement.total_unforesee_expenses ?? 0,
+      total_to_pay: settlement.total_to_pay ?? 0,
+      total_deductions: settlement.total_deductions ?? 0,
+      extra_discounts: settlement.extra_discounts ?? 0,
+      bonifications: settlement.bonifications ?? 0,
+      final_amount: settlement.final_amount ?? 0,
       payment_method: settlement.payment_method as any,
-      notes: settlement.notes,
-      is_paid: settlement.is_paid,
-      payment_date: settlement.payment_date,
-      created_at: settlement.created_at,
-      updated_at: settlement.updated_at,
-      deleted_at: settlement.deleted_at,
+      notes: settlement.notes ?? null,
+      is_paid: settlement.is_paid ?? false,
+      payment_date: settlement.payment_date ?? null,
+      created_at: settlement.created_at ?? new Date(),
+      updated_at: settlement.updated_at ?? new Date(),
+      deleted_at: settlement.deleted_at ?? null,
     };
   }
 }

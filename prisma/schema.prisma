@@ -168,17 +168,18 @@ model DriverVehicle {
 
 model Trip {
   id                String   @id @default(cuid())
-  reference_number  String   @unique
-  origin            String
-  destination       String
-  status            String   @default("PENDING") // PENDING, IN_PROGRESS, COMPLETED, CANCELLED
-  scheduled_date    DateTime
+  reference_number  String?  @unique
+  ctg               String?
+  origin            String?
+  destination       String?
+  status            String?  @default("COMPLETED")
+  scheduled_date    DateTime?
   actual_start_date DateTime?
   actual_end_date   DateTime?
   distance_km       Float?
   km_start          Float?
   km_end            Float?
-  estimated_cost    Float
+  estimated_cost    Float?
   actual_cost       Float?
   per_diems_delivered Float @default(0)
   load_description  String?
@@ -196,11 +197,11 @@ model Trip {
   deleted_at        DateTime?
 
   // Relations
-  driver_id         String
-  driver            Driver   @relation(fields: [driver_id], references: [id], onDelete: Restrict)
+  driver_id         String?
+  driver            Driver?  @relation(fields: [driver_id], references: [id], onDelete: Restrict)
   
-  vehicle_id        String
-  vehicle           Vehicle  @relation(fields: [vehicle_id], references: [id], onDelete: Restrict)
+  vehicle_id        String?
+  vehicle           Vehicle? @relation(fields: [vehicle_id], references: [id], onDelete: Restrict)
   
   client_id         String?
   client            Client?  @relation(fields: [client_id], references: [id], onDelete: Restrict)

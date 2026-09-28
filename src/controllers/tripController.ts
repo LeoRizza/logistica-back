@@ -18,7 +18,7 @@ export class TripController extends BaseController {
         return;
       }
 
-      // Validación inicial de campos requeridos del frontend
+      // Extracción de campos del frontend
       const {
         bill_of_lading,
         amount_to_pay,
@@ -40,82 +40,66 @@ export class TripController extends BaseController {
         net_weight_kg,
         rate_per_kg,
         invoice_number,
-        status,
+        ctg,
         notes,
+        actual_start_date,
+        actual_end_date,
+        actual_cost,
       } = req.body;
 
-      // Validar campos requeridos
-      const validationErrors: Record<string, string[]> = {};
-      
-      if (!bill_of_lading || typeof bill_of_lading !== 'string' || bill_of_lading.trim() === '') {
-        validationErrors.bill_of_lading = ['Bill of lading is required'];
-      }
-      if (amount_to_pay === undefined || amount_to_pay === null || typeof amount_to_pay !== 'number' || amount_to_pay < 0) {
-        validationErrors.amount_to_pay = ['Amount to pay is required and must be a positive number'];
-      }
-      if (!date || typeof date !== 'string') {
-        validationErrors.date = ['Date is required and must be a valid ISO string'];
-      } else {
-        const parsedDate = new Date(date);
-        if (isNaN(parsedDate.getTime())) {
-          validationErrors.date = ['Date must be a valid ISO format (YYYY-MM-DD)'];
-        }
-      }
-      if (estimated_km === undefined || estimated_km === null || typeof estimated_km !== 'number' || estimated_km < 0) {
-        validationErrors.estimated_km = ['Estimated km is required and must be a positive number'];
-      }
-      if (!driver_id || typeof driver_id !== 'string' || driver_id.trim() === '') {
-        validationErrors.driver_id = ['Driver ID is required'];
-      }
-      if (!vehicle_id || typeof vehicle_id !== 'string' || vehicle_id.trim() === '') {
-        validationErrors.vehicle_id = ['Vehicle ID is required'];
-      }
-
-      if (Object.keys(validationErrors).length > 0) {
-        this.sendError(res, 'Validation failed', 400, validationErrors, req);
-        return;
-      }
-
       // Mapeo de datos del frontend al formato de Prisma
-      // bill_of_lading -> reference_number, amount_to_pay -> estimated_cost, date -> scheduled_date
-      const reference_number = bill_of_lading!.trim();
-      const estimated_cost = amount_to_pay!;
-      const scheduled_date = new Date(date!);
-      const distance_km = estimated_km!;
+      // Convertir fechas solo si tienen valores válidos
+      const scheduled_date = date ? new Date(date) : null;
+      const parsedActualStartDate = actual_start_date ? new Date(actual_start_date) : null;
+      const parsedActualEndDate = actual_end_date ? new Date(actual_end_date) : null;
 
-      // Parsear campos numéricos opcionales
-      const parsedLoadedWeightKg = typeof loaded_weight_kg === 'string' ? parseFloat(loaded_weight_kg) : loaded_weight_kg;
-      const parsedNetWeightKg = typeof net_weight_kg === 'string' ? parseFloat(net_weight_kg) : net_weight_kg;
-      const parsedRatePerKg = typeof rate_per_kg === 'string' ? parseFloat(rate_per_kg) : rate_per_kg;
+      // Parsear campos numéricos - pasar null si vienen vacíos
+      const parseNumericField = (value: any): number | null => {
+        if (value === undefined || value === null || value === '') return null;
+        const parsed = typeof value === 'string' ? parseFloat(value) : value;
+        return isNaN(parsed) ? null : parsed;
+      };
+
+      const parsedEstimatedCost = parseNumericField(amount_to_pay);
+      const parsedActualCost = parseNumericField(actual_cost);
+      const parsedDistanceKm = parseNumericField(estimated_km);
+      const parsedKmStart = parseNumericField(km_start);
+      const parsedKmEnd = parseNumericField(km_end);
+      const parsedLoadWeightTons = parseNumericField(load_weight_tons);
+      const parsedLoadVolume = parseNumericField(load_volume_m3);
+      const parsedLoadedWeightKg = parseNumericField(loaded_weight_kg);
+      const parsedNetWeightKg = parseNumericField(net_weight_kg);
+      const parsedRatePerKg = parseNumericField(rate_per_kg);
 
       const createTripPayload: any = {
-        reference_number,
+        reference_number: bill_of_lading,
         origin,
         destination,
         driver_id,
         vehicle_id,
+        client_id,
         scheduled_date,
-        distance_km,
-        km_start,
-        km_end,
-        estimated_cost,
+        actual_start_date: parsedActualStartDate,
+        actual_end_date: parsedActualEndDate,
+        distance_km: parsedDistanceKm,
+        km_start: parsedKmStart,
+        km_end: parsedKmEnd,
+        estimated_cost: parsedEstimatedCost,
+        actual_cost: parsedActualCost,
         per_diems_delivered,
         load_description,
-        load_weight_tons,
-        load_volume_m3,
+        load_weight_tons: parsedLoadWeightTons,
+        load_volume_m3: parsedLoadVolume,
         loaded_weight_kg: parsedLoadedWeightKg,
         net_weight_kg: parsedNetWeightKg,
         rate_per_kg: parsedRatePerKg,
         invoice_number,
-        status: status || 'PENDING',
+        ctg,
+        status: 'COMPLETED',
         notes,
         unforesee_expenses,
         created_by_id: userId,
       };
-
-      if (client_id) {
-        createTripPayload.client_id = client_id;
-      }
 
       const result = await this.tripService.createTrip(createTripPayload);
 
@@ -134,8 +118,9 @@ export class TripController extends BaseController {
   async getTrips(req: AuthenticatedRequest, res: Response): Promise<void> {
     try {
       const { page, limit } = this.getPaginationParams(req);
+      const { status, driver_id, client_id } = req.query;
 
-      const result = await this.tripService.getTrips(page, limit);
+      const result = await this.tripService.getTrips(page, limit, status as string | undefined, driver_id as string | undefined, client_id as string | undefined);
 
       if (!result.success) {
         this.sendError(res, result.message, 400, undefined, req);
@@ -209,6 +194,7 @@ export class TripController extends BaseController {
 
       // Extracción de campos del frontend
       const {
+        bill_of_lading,
         amount_to_pay,
         date,
         estimated_km,
@@ -228,48 +214,66 @@ export class TripController extends BaseController {
         net_weight_kg,
         rate_per_kg,
         invoice_number,
+        ctg,
         notes,
         status,
+        actual_start_date,
+        actual_end_date,
+        actual_cost,
       } = req.body;
 
       // Mapeo de datos del frontend al formato de Prisma
-      // amount_to_pay -> estimated_cost, date -> scheduled_date, estimated_km -> distance_km
-      // Nota: reference_number NO puede ser actualizado (es inmutable en el servicio)
-      const estimated_cost = amount_to_pay;
-      const scheduled_date = date ? new Date(date) : undefined;
-      const distance_km = estimated_km;
+      // Convertir fechas solo si tienen valores válidos
+      const scheduled_date = date ? new Date(date) : null;
+      const parsedActualStartDate = actual_start_date ? new Date(actual_start_date) : null;
+      const parsedActualEndDate = actual_end_date ? new Date(actual_end_date) : null;
 
-      // Parsear campos numéricos opcionales
-      const parsedLoadedWeightKg = typeof loaded_weight_kg === 'string' ? parseFloat(loaded_weight_kg) : loaded_weight_kg;
-      const parsedNetWeightKg = typeof net_weight_kg === 'string' ? parseFloat(net_weight_kg) : net_weight_kg;
-      const parsedRatePerKg = typeof rate_per_kg === 'string' ? parseFloat(rate_per_kg) : rate_per_kg;
+      // Parsear campos numéricos - pasar null si vienen vacíos
+      const parseNumericField = (value: any): number | null => {
+        if (value === undefined || value === null || value === '') return null;
+        const parsed = typeof value === 'string' ? parseFloat(value) : value;
+        return isNaN(parsed) ? null : parsed;
+      };
+
+      const parsedEstimatedCost = parseNumericField(amount_to_pay);
+      const parsedActualCost = parseNumericField(actual_cost);
+      const parsedDistanceKm = parseNumericField(estimated_km);
+      const parsedKmStart = parseNumericField(km_start);
+      const parsedKmEnd = parseNumericField(km_end);
+      const parsedLoadWeightTons = parseNumericField(load_weight_tons);
+      const parsedLoadVolume = parseNumericField(load_volume_m3);
+      const parsedLoadedWeightKg = parseNumericField(loaded_weight_kg);
+      const parsedNetWeightKg = parseNumericField(net_weight_kg);
+      const parsedRatePerKg = parseNumericField(rate_per_kg);
 
       const updatePayload: any = {
+        reference_number: bill_of_lading,
         origin,
         destination,
         driver_id,
         vehicle_id,
+        client_id,
         scheduled_date,
-        distance_km,
-        km_start,
-        km_end,
-        estimated_cost,
+        actual_start_date: parsedActualStartDate,
+        actual_end_date: parsedActualEndDate,
+        distance_km: parsedDistanceKm,
+        km_start: parsedKmStart,
+        km_end: parsedKmEnd,
+        estimated_cost: parsedEstimatedCost,
+        actual_cost: parsedActualCost,
         per_diems_delivered,
         load_description,
-        load_weight_tons,
-        load_volume_m3,
+        load_weight_tons: parsedLoadWeightTons,
+        load_volume_m3: parsedLoadVolume,
         loaded_weight_kg: parsedLoadedWeightKg,
         net_weight_kg: parsedNetWeightKg,
         rate_per_kg: parsedRatePerKg,
         invoice_number,
+        ctg,
         notes,
         unforesee_expenses,
         status,
       };
-
-      if (client_id !== undefined) {
-        updatePayload.client_id = client_id;
-      }
 
       const result = await this.tripService.updateTrip(id, updatePayload);
 

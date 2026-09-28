@@ -110,7 +110,6 @@ export class DashboardService extends BaseService {
       const trips = await this.prisma.trip.findMany({
         where: {
           deleted_at: null,
-          status: { not: 'CANCELLED' },
           scheduled_date: {
             gte: startDate,
             lte: endDate,
@@ -127,7 +126,6 @@ export class DashboardService extends BaseService {
               gte: startDate,
               lte: endDate,
             },
-            status: { not: 'CANCELLED' },
           },
         },
         include: {
