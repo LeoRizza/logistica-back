@@ -48,10 +48,10 @@ export class TripController extends BaseController {
       } = req.body;
 
       // Mapeo de datos del frontend al formato de Prisma
-      // Convertir fechas solo si tienen valores válidos
-      const scheduled_date = date ? new Date(date) : null;
-      const parsedActualStartDate = actual_start_date ? new Date(actual_start_date) : null;
-      const parsedActualEndDate = actual_end_date ? new Date(actual_end_date) : null;
+      // Convertir fechas solo si tienen valores válidos; pasar null si vienen vacíos
+      const scheduled_date = date && date !== '' && date !== null ? new Date(date) : null;
+      const parsedActualStartDate = actual_start_date && actual_start_date !== '' && actual_start_date !== null ? new Date(actual_start_date) : null;
+      const parsedActualEndDate = actual_end_date && actual_end_date !== '' && actual_end_date !== null ? new Date(actual_end_date) : null;
 
       // Parsear campos numéricos - pasar null si vienen vacíos
       const parseNumericField = (value: any): number | null => {
@@ -71,6 +71,18 @@ export class TripController extends BaseController {
       const parsedNetWeightKg = parseNumericField(net_weight_kg);
       const parsedRatePerKg = parseNumericField(rate_per_kg);
 
+      // Parsear unforesee_expenses - convertir a formato esperado
+      let parsedUnforeseeExpenses: Array<{ detail: string; amount: number }> | undefined = undefined;
+      if (unforesee_expenses && Array.isArray(unforesee_expenses)) {
+        parsedUnforeseeExpenses = unforesee_expenses.map((expense: any) => ({
+          detail: expense.detail || expense.description || 'Gasto imprevisto',
+          amount: parseNumericField(expense.amount) || 0,
+        }));
+      }
+
+      // Permitir blanquear per_diems_delivered
+      const parsedPerDiemsDelivered = per_diems_delivered === null || per_diems_delivered === '' ? null : (per_diems_delivered ?? null);
+
       const createTripPayload: any = {
         reference_number: bill_of_lading,
         origin,
@@ -86,7 +98,7 @@ export class TripController extends BaseController {
         km_end: parsedKmEnd,
         estimated_cost: parsedEstimatedCost,
         actual_cost: parsedActualCost,
-        per_diems_delivered,
+        per_diems_delivered: parsedPerDiemsDelivered,
         load_description,
         load_weight_tons: parsedLoadWeightTons,
         load_volume_m3: parsedLoadVolume,
@@ -97,7 +109,7 @@ export class TripController extends BaseController {
         ctg,
         status: 'COMPLETED',
         notes,
-        unforesee_expenses,
+        unforesee_expenses: parsedUnforeseeExpenses,
         created_by_id: userId,
       };
 
@@ -108,7 +120,19 @@ export class TripController extends BaseController {
         return;
       }
 
-      this.sendSuccess(res, result.data, result.message, 201, req);
+      // Transformar tripExpenses a unforesee_expenses para el frontend
+      const trip = result.data as any;
+      const transformedTrip = {
+        ...trip,
+        unforesee_expenses: trip.tripExpenses?.map((expense: any) => ({
+          id: expense.id,
+          detail: expense.description,
+          amount: expense.amount,
+        })) || [],
+        tripExpenses: undefined,
+      };
+
+      this.sendSuccess(res, transformedTrip, result.message, 201, req);
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Error creating trip';
       this.sendError(res, message, 500, undefined, req);
@@ -223,10 +247,10 @@ export class TripController extends BaseController {
       } = req.body;
 
       // Mapeo de datos del frontend al formato de Prisma
-      // Convertir fechas solo si tienen valores válidos
-      const scheduled_date = date ? new Date(date) : null;
-      const parsedActualStartDate = actual_start_date ? new Date(actual_start_date) : null;
-      const parsedActualEndDate = actual_end_date ? new Date(actual_end_date) : null;
+      // Convertir fechas solo si tienen valores válidos; pasar null si vienen vacíos
+      const scheduled_date = date && date !== '' && date !== null ? new Date(date) : null;
+      const parsedActualStartDate = actual_start_date && actual_start_date !== '' && actual_start_date !== null ? new Date(actual_start_date) : null;
+      const parsedActualEndDate = actual_end_date && actual_end_date !== '' && actual_end_date !== null ? new Date(actual_end_date) : null;
 
       // Parsear campos numéricos - pasar null si vienen vacíos
       const parseNumericField = (value: any): number | null => {
@@ -246,6 +270,18 @@ export class TripController extends BaseController {
       const parsedNetWeightKg = parseNumericField(net_weight_kg);
       const parsedRatePerKg = parseNumericField(rate_per_kg);
 
+      // Parsear unforesee_expenses - convertir a formato esperado
+      let parsedUnforeseeExpenses: Array<{ detail: string; amount: number }> | undefined = undefined;
+      if (unforesee_expenses && Array.isArray(unforesee_expenses)) {
+        parsedUnforeseeExpenses = unforesee_expenses.map((expense: any) => ({
+          detail: expense.detail || expense.description || 'Gasto imprevisto',
+          amount: parseNumericField(expense.amount) || 0,
+        }));
+      }
+
+      // Permitir blanquear per_diems_delivered
+      const parsedPerDiemsDelivered = per_diems_delivered === null || per_diems_delivered === '' ? null : (per_diems_delivered ?? null);
+
       const updatePayload: any = {
         reference_number: bill_of_lading,
         origin,
@@ -261,7 +297,7 @@ export class TripController extends BaseController {
         km_end: parsedKmEnd,
         estimated_cost: parsedEstimatedCost,
         actual_cost: parsedActualCost,
-        per_diems_delivered,
+        per_diems_delivered: parsedPerDiemsDelivered,
         load_description,
         load_weight_tons: parsedLoadWeightTons,
         load_volume_m3: parsedLoadVolume,
@@ -271,7 +307,7 @@ export class TripController extends BaseController {
         invoice_number,
         ctg,
         notes,
-        unforesee_expenses,
+        unforesee_expenses: parsedUnforeseeExpenses,
         status,
       };
 
