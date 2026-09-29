@@ -80,8 +80,9 @@ class SettlementService extends BaseService {
     });
 
     // Calcular totales
+    // REGLA 3: El total ganado es la suma de actual_cost, no estimated_cost
     const total_amount_earned = trips.reduce(
-      (sum, trip) => sum + (trip.estimated_cost ?? 0),
+      (sum, trip) => sum + (trip.actual_cost ?? 0),
       0
     );
     const total_trip_expenses = trips.reduce(

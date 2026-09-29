@@ -46,7 +46,7 @@ interface CreateTripInput {
   distance_km?: number | null;
   km_start?: number | null;
   km_end?: number | null;
-  estimated_cost?: number | null;
+  actual_cost?: number | null;
   per_diems_delivered?: number | null;
   load_description?: string | null;
   load_weight_tons?: number | null;
@@ -153,18 +153,21 @@ export class TripService extends BaseService {
         }
       }
 
-      let estimatedCost = tripData.estimated_cost;
-      if (estimatedCost === undefined || estimatedCost === null) {
-        if (
-          tripData.net_weight_kg !== undefined &&
-          tripData.net_weight_kg !== null &&
-          tripData.rate_per_kg !== undefined &&
-          tripData.rate_per_kg !== null
-        ) {
-          estimatedCost = Number(tripData.net_weight_kg) * Number(tripData.rate_per_kg);
-        } else {
-          estimatedCost = null;
-        }
+      // REGLA 2: Ingresos del viaje calculados como loaded_weight_kg * rate_per_kg
+      let estimatedCost: number | null = null;
+      if (
+        tripData.loaded_weight_kg !== undefined &&
+        tripData.loaded_weight_kg !== null &&
+        tripData.rate_per_kg !== undefined &&
+        tripData.rate_per_kg !== null
+      ) {
+        estimatedCost = Number(tripData.loaded_weight_kg) * Number(tripData.rate_per_kg);
+      }
+
+      // REGLA 3: Si no hay actual_cost pero sí hay estimatedCost > 0, calcular default 17%
+      let actualCost = tripData.actual_cost !== undefined && tripData.actual_cost !== null ? tripData.actual_cost : null;
+      if ((actualCost === null || actualCost === undefined) && estimatedCost && estimatedCost > 0) {
+        actualCost = Number((estimatedCost * 0.17).toFixed(2));
       }
 
       const trip = await this.prisma.trip.create({
@@ -181,6 +184,7 @@ export class TripService extends BaseService {
           km_start: tripData.km_start,
           km_end: tripData.km_end,
           estimated_cost: estimatedCost,
+          actual_cost: actualCost,
           per_diems_delivered: tripData.per_diems_delivered ?? 0,
           load_description: sanitizedLoadDesc,
           load_weight_tons: tripData.load_weight_tons,
@@ -356,17 +360,23 @@ export class TripService extends BaseService {
         });
       }
 
-      // Calcular estimated_cost si se proporcionan net_weight_kg y rate_per_kg
+      // REGLA 2: Ingresos del viaje calculados como loaded_weight_kg * rate_per_kg
       let estimatedCost: number | undefined = undefined;
-      if (tripData.estimated_cost !== undefined && tripData.estimated_cost !== null) {
-        estimatedCost = tripData.estimated_cost;
-      } else if (
-        tripData.net_weight_kg !== undefined &&
-        tripData.net_weight_kg !== null &&
+      if (
+        tripData.loaded_weight_kg !== undefined &&
+        tripData.loaded_weight_kg !== null &&
         tripData.rate_per_kg !== undefined &&
         tripData.rate_per_kg !== null
       ) {
-        estimatedCost = Number(tripData.net_weight_kg) * Number(tripData.rate_per_kg);
+        estimatedCost = Number(tripData.loaded_weight_kg) * Number(tripData.rate_per_kg);
+      }
+
+      // REGLA 3: Si no hay actual_cost pero sí hay estimatedCost > 0, calcular default 17%
+      let actualCost: number | undefined = undefined;
+      if (tripData.actual_cost !== undefined && tripData.actual_cost !== null) {
+        actualCost = tripData.actual_cost;
+      } else if (estimatedCost !== undefined && estimatedCost > 0) {
+        actualCost = Number((estimatedCost * 0.17).toFixed(2));
       }
 
       // Construir el objeto de actualización tipado correctamente
@@ -383,7 +393,7 @@ export class TripService extends BaseService {
         ...(tripData.km_start !== undefined && { km_start: tripData.km_start }),
         ...(tripData.km_end !== undefined && { km_end: tripData.km_end }),
         ...(estimatedCost !== undefined && { estimated_cost: estimatedCost }),
-        ...(tripData.actual_cost !== undefined && { actual_cost: tripData.actual_cost }),
+        ...(actualCost !== undefined && { actual_cost: actualCost }),
         ...(tripData.per_diems_delivered !== undefined && { per_diems_delivered: tripData.per_diems_delivered ?? 0 }),
         ...(sanitizedLoadDescription !== undefined && { load_description: sanitizedLoadDescription }),
         ...(tripData.load_weight_tons !== undefined && { load_weight_tons: tripData.load_weight_tons }),
@@ -626,7 +636,7 @@ export class TripService extends BaseService {
 
   /**
    * Motor de liquidaciones - Calcula el preview de liquidación para un conductor
-   * Utiliza agregación de Prisma para sumar en base de datos, sin bucles en memoria
+   * REGLA 3: El monto ganado por el chofer es trip.actual_cost
    */
   async getSettlementPreview(
     driverId: string,
@@ -660,6 +670,9 @@ export class TripService extends BaseService {
           destination: true,
           distance_km: true,
           estimated_cost: true,
+          actual_cost: true,
+          loaded_weight_kg: true,
+          rate_per_kg: true,
           status: true,
           scheduled_date: true,
           actual_start_date: true,
@@ -687,21 +700,37 @@ export class TripService extends BaseService {
         },
         _sum: {
           distance_km: true,
-          estimated_cost: true,
+          actual_cost: true,
         },
         _count: true,
       });
 
       // Calcular viaticos y flat pay basado en la política de la empresa
       // estimated_cost se usa como base para cálculos
-      const totalEstimatedCost = aggregation._sum.estimated_cost || 0;
+      const totalAmountEarned = aggregation._sum.actual_cost || 0;
       const totalDistanceKm = aggregation._sum.distance_km || 0;
 
       // Política de liquidación (configurable)
       // Viaticos: 10% del costo estimado
       // Flat pay del conductor: 80% del costo estimado
-      const totalViaticosAmount = parseFloat((totalEstimatedCost * 0.1).toFixed(2));
-      const totalDriverFlatPay = parseFloat((totalEstimatedCost * 0.8).toFixed(2));
+      const totalViaticosAmount = parseFloat((totalAmountEarned * 0.1).toFixed(2));
+      const totalDriverFlatPay = parseFloat((totalAmountEarned * 0.8).toFixed(2));
+
+      const mappedTrips = trips.map((trip: any) => ({
+        id: trip.id,
+        reference_number: trip.reference_number,
+        origin: trip.origin,
+        destination: trip.destination,
+        distance_km: trip.distance_km,
+        estimated_cost: trip.actual_cost ?? trip.estimated_cost ?? 0,
+        amount_to_pay: trip.actual_cost ?? 0,
+        status: trip.status,
+        scheduled_date: trip.scheduled_date,
+        actual_start_date: trip.actual_start_date,
+        actual_end_date: trip.actual_end_date,
+        load_description: trip.load_description,
+        load_weight_tons: trip.load_weight_tons,
+      }));
 
       const settlement: SettlementPreview = {
         driver_id: driverId,
@@ -709,7 +738,7 @@ export class TripService extends BaseService {
         total_viaticos_amount: totalViaticosAmount,
         total_driver_flat_pay: totalDriverFlatPay,
         trip_count: aggregation._count,
-        trips: trips as any,
+        trips: mappedTrips,
       };
 
       return this.createSuccessResponse(

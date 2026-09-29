@@ -107,6 +107,7 @@ export class DashboardService extends BaseService {
   > {
     try {
       // Obtener todos los viajes completados en el período
+      // REGLA 1: Filtrar por scheduled_date (fecha única del viaje)
       const trips = await this.prisma.trip.findMany({
         where: {
           deleted_at: null,
@@ -138,15 +139,18 @@ export class DashboardService extends BaseService {
       trips.forEach(trip => {
         if (trip.loaded_weight_kg && trip.rate_per_kg) {
           grossRevenue += trip.loaded_weight_kg * trip.rate_per_kg;
+        } else if (trip.estimated_cost) {
+          grossRevenue += trip.estimated_cost;
         }
       });
 
-      // Calcular costos de viajes
+      // REGLA 3: Calcular costos de viajes - incluir pago al chofer (actual_cost)
       let totalAmountToPay = 0;
       let totalPerDiemsDelivered = 0;
       let totalUnforeseeExpenses = 0;
 
       trips.forEach(trip => {
+        // El costo del viaje es el pago al chofer (actual_cost)
         if (trip.actual_cost) {
           totalAmountToPay += trip.actual_cost;
         }

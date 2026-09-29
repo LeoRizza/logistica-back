@@ -45,11 +45,13 @@ export class TripController extends BaseController {
         actual_start_date,
         actual_end_date,
         actual_cost,
+        scheduled_date: scheduled_date_param,
       } = req.body;
 
       // Mapeo de datos del frontend al formato de Prisma
-      // Convertir fechas solo si tienen valores válidos; pasar null si vienen vacíos
-      const scheduled_date = date && date !== '' && date !== null ? new Date(date) : null;
+      // REGLA 1: Fecha única usando scheduled_date o date
+      const rawDate = scheduled_date_param || date;
+      const scheduled_date = rawDate && rawDate !== '' && rawDate !== null ? new Date(rawDate) : null;
       const parsedActualStartDate = actual_start_date && actual_start_date !== '' && actual_start_date !== null ? new Date(actual_start_date) : null;
       const parsedActualEndDate = actual_end_date && actual_end_date !== '' && actual_end_date !== null ? new Date(actual_end_date) : null;
 
@@ -60,8 +62,9 @@ export class TripController extends BaseController {
         return isNaN(parsed) ? null : parsed;
       };
 
-      const parsedEstimatedCost = parseNumericField(amount_to_pay);
-      const parsedActualCost = parseNumericField(actual_cost);
+      // REGLA 3: Monto a pagar al chofer (actual_cost) - acepta tanto amount_to_pay como actual_cost
+      const rawAmountToPay = amount_to_pay !== undefined ? amount_to_pay : actual_cost;
+      const parsedActualCost = rawAmountToPay !== null && rawAmountToPay !== '' && rawAmountToPay !== undefined ? parseNumericField(rawAmountToPay) : null;
       const parsedDistanceKm = parseNumericField(estimated_km);
       const parsedKmStart = parseNumericField(km_start);
       const parsedKmEnd = parseNumericField(km_end);
@@ -96,7 +99,6 @@ export class TripController extends BaseController {
         distance_km: parsedDistanceKm,
         km_start: parsedKmStart,
         km_end: parsedKmEnd,
-        estimated_cost: parsedEstimatedCost,
         actual_cost: parsedActualCost,
         per_diems_delivered: parsedPerDiemsDelivered,
         load_description,
@@ -244,11 +246,13 @@ export class TripController extends BaseController {
         actual_start_date,
         actual_end_date,
         actual_cost,
+        scheduled_date: scheduled_date_param,
       } = req.body;
 
       // Mapeo de datos del frontend al formato de Prisma
-      // Convertir fechas solo si tienen valores válidos; pasar null si vienen vacíos
-      const scheduled_date = date && date !== '' && date !== null ? new Date(date) : null;
+      // REGLA 1: Fecha única usando scheduled_date o date
+      const rawDate = scheduled_date_param || date;
+      const scheduled_date = rawDate && rawDate !== '' && rawDate !== null ? new Date(rawDate) : null;
       const parsedActualStartDate = actual_start_date && actual_start_date !== '' && actual_start_date !== null ? new Date(actual_start_date) : null;
       const parsedActualEndDate = actual_end_date && actual_end_date !== '' && actual_end_date !== null ? new Date(actual_end_date) : null;
 
@@ -259,8 +263,9 @@ export class TripController extends BaseController {
         return isNaN(parsed) ? null : parsed;
       };
 
-      const parsedEstimatedCost = parseNumericField(amount_to_pay);
-      const parsedActualCost = parseNumericField(actual_cost);
+      // REGLA 3: Monto a pagar al chofer (actual_cost) - acepta tanto amount_to_pay como actual_cost
+      const rawAmountToPay = amount_to_pay !== undefined ? amount_to_pay : actual_cost;
+      const parsedActualCost = rawAmountToPay !== null && rawAmountToPay !== '' && rawAmountToPay !== undefined ? parseNumericField(rawAmountToPay) : null;
       const parsedDistanceKm = parseNumericField(estimated_km);
       const parsedKmStart = parseNumericField(km_start);
       const parsedKmEnd = parseNumericField(km_end);
@@ -295,7 +300,6 @@ export class TripController extends BaseController {
         distance_km: parsedDistanceKm,
         km_start: parsedKmStart,
         km_end: parsedKmEnd,
-        estimated_cost: parsedEstimatedCost,
         actual_cost: parsedActualCost,
         per_diems_delivered: parsedPerDiemsDelivered,
         load_description,
