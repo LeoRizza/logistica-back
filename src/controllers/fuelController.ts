@@ -277,29 +277,47 @@ export class FuelController extends BaseController {
   /**
    * PUT /fuel-logs/:id
    * Actualiza un registro de combustible
+   * IMPORTANTE: Acepta EITHER fuel_price_per_liter OR total_cost (no ambos)
+   * Recalcula automáticamente distance_km y liters_per_km si cambia el odómetro
    */
   async updateFuelLog(req: AuthenticatedRequest, res: Response): Promise<void> {
     try {
       const { id } = req.params;
-      const { liters_loaded, fuel_price_per_liter, odometer_reading, fuel_type, station_name, location, notes, trip_id } = req.body;
+      const { liters_loaded, fuel_price_per_liter, total_cost, odometer_reading, fuel_type, station_name, location, notes, trip_id } = req.body;
 
       if (!id || typeof id !== 'string') {
         this.sendError(res, 'Fuel log ID is required and must be a string', 400, undefined, req);
         return;
       }
 
+      // Convertir strings a números si es necesario
+      const parsedLitersLoaded = typeof liters_loaded === 'string' ? parseFloat(liters_loaded) : liters_loaded;
+      const parsedFuelPrice = typeof fuel_price_per_liter === 'string' ? parseFloat(fuel_price_per_liter) : fuel_price_per_liter;
+      const parsedTotalCost = typeof total_cost === 'string' ? parseFloat(total_cost) : total_cost;
+      const parsedOdometer = typeof odometer_reading === 'string' ? parseFloat(odometer_reading) : odometer_reading;
+
       // Validación de campos opcionales
       const errors: Record<string, string[]> = {};
 
-      if (liters_loaded !== undefined && (typeof liters_loaded !== 'number' || liters_loaded <= 0)) {
+      if (liters_loaded !== undefined && (isNaN(parsedLitersLoaded) || parsedLitersLoaded <= 0)) {
         errors.liters_loaded = ['Liters loaded must be a number and greater than 0'];
       }
 
-      if (fuel_price_per_liter !== undefined && (typeof fuel_price_per_liter !== 'number' || fuel_price_per_liter <= 0)) {
-        errors.fuel_price_per_liter = ['Fuel price per liter must be a number and greater than 0'];
+      // Validar que se proporcione EITHER fuel_price_per_liter OR total_cost, pero no ambos
+      if ((parsedFuelPrice !== undefined || parsedTotalCost !== undefined)) {
+        const hasFuelPrice = parsedFuelPrice !== undefined && !isNaN(parsedFuelPrice) && parsedFuelPrice > 0;
+        const hasTotalCost = parsedTotalCost !== undefined && !isNaN(parsedTotalCost) && parsedTotalCost > 0;
+
+        if (hasFuelPrice && hasTotalCost) {
+          errors.fuel_price = ['Cannot provide both fuel_price_per_liter and total_cost. Provide only one.'];
+        } else if ((parsedFuelPrice !== undefined && isNaN(parsedFuelPrice)) || (parsedFuelPrice !== undefined && parsedFuelPrice <= 0)) {
+          errors.fuel_price_per_liter = ['Fuel price per liter must be a number and greater than 0'];
+        } else if ((parsedTotalCost !== undefined && isNaN(parsedTotalCost)) || (parsedTotalCost !== undefined && parsedTotalCost <= 0)) {
+          errors.total_cost = ['Total cost must be a number and greater than 0'];
+        }
       }
 
-      if (odometer_reading !== undefined && (typeof odometer_reading !== 'number' || odometer_reading < 0)) {
+      if (odometer_reading !== undefined && (isNaN(parsedOdometer) || parsedOdometer < 0)) {
         errors.odometer_reading = ['Odometer reading must be a non-negative number'];
       }
 
@@ -316,21 +334,22 @@ export class FuelController extends BaseController {
         return;
       }
 
-      // Construir datos de actualización
+      // Construir datos de actualización con valores parseados
       const updateData: Partial<CreateFuelLogInput> = {};
-      if (liters_loaded !== undefined) updateData.liters_loaded = liters_loaded;
-      if (fuel_price_per_liter !== undefined) updateData.fuel_price_per_liter = fuel_price_per_liter;
-      if (odometer_reading !== undefined) updateData.odometer_reading = odometer_reading;
+      if (liters_loaded !== undefined) updateData.liters_loaded = parsedLitersLoaded;
+      if (fuel_price_per_liter !== undefined) updateData.fuel_price_per_liter = parsedFuelPrice;
+      if (total_cost !== undefined) updateData.total_cost = parsedTotalCost;
+      if (odometer_reading !== undefined) updateData.odometer_reading = parsedOdometer;
       if (fuel_type !== undefined) updateData.fuel_type = fuel_type;
-      if (station_name !== undefined) updateData.station_name = station_name;
-      if (location !== undefined) updateData.location = location;
-      if (notes !== undefined) updateData.notes = notes;
+      if (station_name !== undefined) updateData.station_name = station_name ? station_name.trim() : undefined;
+      if (location !== undefined) updateData.location = location ? location.trim() : undefined;
+      if (notes !== undefined) updateData.notes = notes ? notes.trim() : undefined;
       if (trip_id !== undefined) updateData.trip_id = trip_id;
 
       const result = await this.fuelService.updateFuelLog(id, updateData);
 
       if (!result.success) {
-        this.sendError(res, result.message, 404, undefined, req);
+        this.sendError(res, result.message, 400, undefined, req);
         return;
       }
 

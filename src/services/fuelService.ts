@@ -411,6 +411,9 @@ export class FuelService extends BaseService {
 
   /**
    * Actualiza un registro de combustible
+   * IMPORTANTE: Recalcula automáticamente distance_km y liters_per_km si cambia:
+   * - El odómetro (y hay un registro anterior)
+   * - Los litros cargados (afecta liters_per_km)
    * 
    * @param id ID del FuelLog
    * @param updateData Datos a actualizar
@@ -436,27 +439,40 @@ export class FuelService extends BaseService {
       // Construir datos de actualización
       const dataToUpdate: Partial<FuelLog> = {};
 
+      // Variables para rastrear valores actualizados
+      let litersLoaded = existingFuelLog.liters_loaded;
+      let odometerReading = existingFuelLog.odometer_reading;
+      let fuelPricePerLiter = existingFuelLog.fuel_price_per_liter;
+      let totalCost = existingFuelLog.total_cost;
+
+      // Validar y actualizar liters_loaded
       if (updateData.liters_loaded !== undefined) {
         if (updateData.liters_loaded <= 0) {
           return this.createErrorResponse('Liters loaded must be greater than 0');
         }
-        dataToUpdate.liters_loaded = updateData.liters_loaded;
+        litersLoaded = updateData.liters_loaded;
+        dataToUpdate.liters_loaded = litersLoaded;
       }
 
+      // Validar y actualizar fuel_price_per_liter
       if (updateData.fuel_price_per_liter !== undefined) {
         if (updateData.fuel_price_per_liter <= 0) {
           return this.createErrorResponse('Fuel price per liter must be greater than 0');
         }
-        dataToUpdate.fuel_price_per_liter = updateData.fuel_price_per_liter;
+        fuelPricePerLiter = updateData.fuel_price_per_liter;
+        dataToUpdate.fuel_price_per_liter = fuelPricePerLiter;
       }
 
+      // Validar y actualizar odometer_reading
       if (updateData.odometer_reading !== undefined) {
         if (updateData.odometer_reading < 0) {
           return this.createErrorResponse('Odometer reading must be non-negative');
         }
-        dataToUpdate.odometer_reading = updateData.odometer_reading;
+        odometerReading = updateData.odometer_reading;
+        dataToUpdate.odometer_reading = odometerReading;
       }
 
+      // Actualizar campos opcionales
       if (updateData.station_name !== undefined) {
         dataToUpdate.station_name = updateData.station_name ?? null;
       }
@@ -477,12 +493,51 @@ export class FuelService extends BaseService {
         dataToUpdate.trip_id = updateData.trip_id ?? null;
       }
 
-      // Recalcular total_cost si cambió el precio o los litros
-      if (updateData.liters_loaded !== undefined || updateData.fuel_price_per_liter !== undefined) {
-        const liters = updateData.liters_loaded ?? existingFuelLog.liters_loaded;
-        const price = updateData.fuel_price_per_liter ?? existingFuelLog.fuel_price_per_liter;
-        dataToUpdate.total_cost = liters * price;
+      // ============= RECALCULAR total_cost =============
+      // Aceptar EITHER fuel_price_per_liter OR total_cost
+      const hasFuelPrice = updateData.fuel_price_per_liter !== undefined && updateData.fuel_price_per_liter > 0;
+      const hasTotalCost = updateData.total_cost !== undefined && updateData.total_cost > 0;
+
+      if (hasTotalCost && !hasFuelPrice) {
+        // Si se proporciona total_cost, recalcular fuel_price_per_liter
+        totalCost = updateData.total_cost!;
+        fuelPricePerLiter = parseFloat((totalCost / litersLoaded).toFixed(4));
+        dataToUpdate.fuel_price_per_liter = fuelPricePerLiter;
+      } else if (hasFuelPrice || updateData.liters_loaded !== undefined) {
+        // Si cambió precio o litros, recalcular total_cost
+        totalCost = parseFloat((litersLoaded * fuelPricePerLiter).toFixed(2));
       }
+      dataToUpdate.total_cost = totalCost;
+
+      // ============= RECALCULAR distance_km y liters_per_km =============
+      let distanceKm = existingFuelLog.distance_km;
+      let litersPerKm = existingFuelLog.liters_per_km;
+
+      // Si cambió el odómetro y hay un registro anterior, recalcular distance_km
+      if (updateData.odometer_reading !== undefined && existingFuelLog.previous_fuel_log_id) {
+        const previousLog: FuelLog | null = await this.prisma.fuelLog.findUnique({
+          where: { id: existingFuelLog.previous_fuel_log_id },
+        });
+
+        if (previousLog) {
+          distanceKm = odometerReading - previousLog.odometer_reading;
+
+          // Validar que el odómetro no haya bajado
+          if (distanceKm < 0) {
+            return this.createErrorResponse(
+              `Odometer reading (${odometerReading} km) cannot be less than the previous reading (${previousLog.odometer_reading} km)`
+            );
+          }
+        }
+      }
+
+      // Si cambió distance_km o liters_loaded, recalcular liters_per_km
+      if ((updateData.odometer_reading !== undefined || updateData.liters_loaded !== undefined) && distanceKm !== null && distanceKm > 0) {
+        litersPerKm = parseFloat((litersLoaded / distanceKm).toFixed(4));
+      }
+
+      dataToUpdate.distance_km = distanceKm;
+      dataToUpdate.liters_per_km = litersPerKm;
 
       // Actualizar el registro
       const updatedFuelLog: FuelLog = await this.prisma.fuelLog.update({
