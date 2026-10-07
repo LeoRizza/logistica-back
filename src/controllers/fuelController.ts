@@ -63,8 +63,14 @@ export class FuelController extends BaseController {
         errors.total_cost = ['Total cost must be a number greater than 0'];
       }
 
-      if (odometer_reading === undefined || odometer_reading === null || isNaN(parsedOdometer) || parsedOdometer < 0) {
-        errors.odometer_reading = ['Odometer reading is required and must be a non-negative number'];
+      let finalOdometer: number | null = null;
+      if (odometer_reading !== undefined && odometer_reading !== null && odometer_reading !== '') {
+        const parsed = typeof odometer_reading === 'string' ? parseFloat(odometer_reading) : odometer_reading;
+        if (isNaN(parsed) || parsed < 0) {
+          errors.odometer_reading = ['Odometer reading must be a non-negative number'];
+        } else {
+          finalOdometer = parsed;
+        }
       }
 
       if (fuel_type && !Object.values(FuelTypeEnum).includes(fuel_type)) {
@@ -88,7 +94,7 @@ export class FuelController extends BaseController {
         liters_loaded: parsedLitersLoaded,
         fuel_price_per_liter: parsedFuelPrice,
         total_cost: parsedTotalCost,
-        odometer_reading: parsedOdometer,
+        odometer_reading: finalOdometer,
         fuel_type: fuel_type ?? FuelTypeEnum.DIESEL,
         station_name: station_name ? station_name.trim() : undefined,
         location: location ? location.trim() : undefined,
@@ -317,8 +323,14 @@ export class FuelController extends BaseController {
         }
       }
 
-      if (odometer_reading !== undefined && (isNaN(parsedOdometer) || parsedOdometer < 0)) {
-        errors.odometer_reading = ['Odometer reading must be a non-negative number'];
+      let finalOdometer: number | null = null;
+      if (odometer_reading !== undefined && odometer_reading !== null && odometer_reading !== '') {
+        const parsed = typeof odometer_reading === 'string' ? parseFloat(odometer_reading) : odometer_reading;
+        if (isNaN(parsed) || parsed < 0) {
+          errors.odometer_reading = ['Odometer reading must be a non-negative number'];
+        } else {
+          finalOdometer = parsed;
+        }
       }
 
       if (fuel_type !== undefined && !Object.values(FuelTypeEnum).includes(fuel_type)) {
@@ -339,7 +351,7 @@ export class FuelController extends BaseController {
       if (liters_loaded !== undefined) updateData.liters_loaded = parsedLitersLoaded;
       if (fuel_price_per_liter !== undefined) updateData.fuel_price_per_liter = parsedFuelPrice;
       if (total_cost !== undefined) updateData.total_cost = parsedTotalCost;
-      if (odometer_reading !== undefined) updateData.odometer_reading = parsedOdometer;
+      if (odometer_reading !== undefined) updateData.odometer_reading = finalOdometer;
       if (fuel_type !== undefined) updateData.fuel_type = fuel_type;
       if (station_name !== undefined) updateData.station_name = station_name ? station_name.trim() : undefined;
       if (location !== undefined) updateData.location = location ? location.trim() : undefined;

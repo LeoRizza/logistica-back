@@ -73,26 +73,28 @@ export class FuelService extends BaseService {
         return this.createErrorResponse('Calculated fuel price per liter must be greater than 0');
       }
 
-      if (input.odometer_reading < 0) {
+      // Odometer es opcional, solo validar si se proporciona
+      if (input.odometer_reading !== null && input.odometer_reading !== undefined && input.odometer_reading < 0) {
         return this.createErrorResponse('Odometer reading must be non-negative');
       }
 
-      // Obtener el último registro de combustible de este vehículo ordenado por odometer_reading
+      // Obtener el último registro de combustible de este vehículo que tenga odómetro
       const previousFuelLog: FuelLog | null = await this.prisma.fuelLog.findFirst({
         where: {
           vehicle_id: input.vehicle_id,
           deleted_at: null,
+          odometer_reading: { not: null },
         },
         orderBy: {
-          odometer_reading: 'desc',
+          created_at: 'desc',
         },
       });
 
       let distanceKm: number | null = null;
       let litersPerKm: number | null = null;
 
-      // Calcular distancia y promedio de consumo si hay un registro anterior
-      if (previousFuelLog) {
+      // Calcular distancia y promedio de consumo solo si el actual tiene odómetro
+      if (input.odometer_reading !== null && input.odometer_reading !== undefined && previousFuelLog && previousFuelLog.odometer_reading !== null) {
         distanceKm = input.odometer_reading - previousFuelLog.odometer_reading;
 
         // Validar que el odómetro no haya bajado
@@ -114,7 +116,7 @@ export class FuelService extends BaseService {
           vehicle_id: input.vehicle_id,
           liters_loaded: input.liters_loaded,
           fuel_price_per_liter: finalFuelPrice,
-          odometer_reading: input.odometer_reading,
+          odometer_reading: input.odometer_reading ?? null,
           fuel_type: input.fuel_type ?? 'DIESEL',
           station_name: input.station_name ?? null,
           location: input.location ?? null,
@@ -122,9 +124,9 @@ export class FuelService extends BaseService {
           total_cost: finalTotalCost,
           created_by_id: input.created_by_id,
           trip_id: input.trip_id ?? null,
-          distance_km: previousFuelLog ? distanceKm : null,
-          liters_per_km: previousFuelLog ? litersPerKm : null,
-          previous_fuel_log_id: previousFuelLog?.id ?? null,
+          distance_km: distanceKm,
+          liters_per_km: litersPerKm,
+          previous_fuel_log_id: (input.odometer_reading !== null && input.odometer_reading !== undefined && previousFuelLog) ? previousFuelLog.id : null,
           created_at: input.date ? new Date(input.date + 'T12:00:00Z') : undefined,
         },
       });
@@ -465,7 +467,7 @@ export class FuelService extends BaseService {
 
       // Validar y actualizar odometer_reading
       if (updateData.odometer_reading !== undefined) {
-        if (updateData.odometer_reading < 0) {
+        if (updateData.odometer_reading !== null && updateData.odometer_reading < 0) {
           return this.createErrorResponse('Odometer reading must be non-negative');
         }
         odometerReading = updateData.odometer_reading;
@@ -513,21 +515,42 @@ export class FuelService extends BaseService {
       let distanceKm = existingFuelLog.distance_km;
       let litersPerKm = existingFuelLog.liters_per_km;
 
-      // Si cambió el odómetro y hay un registro anterior, recalcular distance_km
-      if (updateData.odometer_reading !== undefined && existingFuelLog.previous_fuel_log_id) {
-        const previousLog: FuelLog | null = await this.prisma.fuelLog.findUnique({
-          where: { id: existingFuelLog.previous_fuel_log_id },
-        });
+      // Si cambió el odómetro, buscar el registro anterior con odómetro
+      if (updateData.odometer_reading !== undefined) {
+        if (odometerReading !== null && odometerReading !== undefined) {
+          // Buscar el registro anterior que tenga odómetro
+          const previousLog: FuelLog | null = await this.prisma.fuelLog.findFirst({
+            where: {
+              vehicle_id: existingFuelLog.vehicle_id,
+              deleted_at: null,
+              odometer_reading: { not: null },
+              id: { not: id }, // Excluir el registro actual
+              created_at: {
+                lt: existingFuelLog.created_at, // Registros anteriores
+              },
+            },
+            orderBy: {
+              created_at: 'desc',
+            },
+          });
 
-        if (previousLog) {
-          distanceKm = odometerReading - previousLog.odometer_reading;
+          if (previousLog && previousLog.odometer_reading !== null) {
+            distanceKm = odometerReading - previousLog.odometer_reading;
 
-          // Validar que el odómetro no haya bajado
-          if (distanceKm < 0) {
-            return this.createErrorResponse(
-              `Odometer reading (${odometerReading} km) cannot be less than the previous reading (${previousLog.odometer_reading} km)`
-            );
+            // Validar que el odómetro no haya bajado
+            if (distanceKm < 0) {
+              return this.createErrorResponse(
+                `Odometer reading (${odometerReading} km) cannot be less than the previous reading (${previousLog.odometer_reading} km)`
+              );
+            }
+          } else {
+            // No hay registro anterior, solo establecer distancia en null
+            distanceKm = null;
           }
+        } else {
+          // El nuevo valor es null, limpiar distancia y consumo
+          distanceKm = null;
+          litersPerKm = null;
         }
       }
 

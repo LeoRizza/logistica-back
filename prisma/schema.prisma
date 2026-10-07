@@ -264,7 +264,7 @@ model FuelLog {
   distance_km           Float?   // Kilómetros recorridos desde la última carga
   fuel_price_per_liter  Float
   total_cost            Float    // liters_loaded * fuel_price_per_liter
-  odometer_reading      Float    // Lectura del odómetro en el momento de carga
+  odometer_reading      Float?   // Lectura del odómetro en el momento de carga
   fuel_type             String   @default("DIESEL") // DIESEL, GASOLINE, LPG
   station_name          String?
   location              String?

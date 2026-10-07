@@ -140,7 +140,7 @@ export interface CreateFuelLogInput {
   liters_loaded: number;
   fuel_price_per_liter?: number; // Optional now, calculated from total_cost if provided
   total_cost?: number; // New: Total amount paid for fuel
-  odometer_reading: number;
+  odometer_reading?: number | null;
   fuel_type?: FuelTypeEnum;
   station_name?: string;
   location?: string;
@@ -157,7 +157,7 @@ export interface FuelLogDTO {
   distance_km: number | null;
   fuel_price_per_liter: number;
   total_cost: number;
-  odometer_reading: number;
+  odometer_reading: number | null;
   fuel_type: string;
   station_name: string | null;
   location: string | null;
