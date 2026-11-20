@@ -21,6 +21,8 @@ export class TripController extends BaseController {
       // Extracción de campos del frontend
       const {
         bill_of_lading,
+        distance_km,
+        reference_number,
         amount_to_pay,
         date,
         estimated_km,
@@ -65,7 +67,8 @@ export class TripController extends BaseController {
       // REGLA 3: Monto a pagar al chofer (actual_cost) - acepta tanto amount_to_pay como actual_cost
       const rawAmountToPay = amount_to_pay !== undefined ? amount_to_pay : actual_cost;
       const parsedActualCost = rawAmountToPay !== null && rawAmountToPay !== '' && rawAmountToPay !== undefined ? parseNumericField(rawAmountToPay) : null;
-      const parsedDistanceKm = parseNumericField(estimated_km);
+      const rawDistanceKm = distance_km !== undefined && distance_km !== null && distance_km !== '' ? distance_km : estimated_km;
+      const parsedDistanceKm = parseNumericField(rawDistanceKm);
       const parsedKmStart = parseNumericField(km_start);
       const parsedKmEnd = parseNumericField(km_end);
       const parsedLoadWeightTons = parseNumericField(load_weight_tons);
@@ -87,7 +90,7 @@ export class TripController extends BaseController {
       const parsedPerDiemsDelivered = per_diems_delivered === null || per_diems_delivered === '' ? null : (per_diems_delivered ?? null);
 
       const createTripPayload: any = {
-        reference_number: bill_of_lading,
+        reference_number: reference_number !== undefined ? reference_number : bill_of_lading,
         origin,
         destination,
         driver_id,
@@ -230,6 +233,8 @@ export class TripController extends BaseController {
       // Extracción de campos del frontend
       const {
         bill_of_lading,
+        distance_km,
+        reference_number,
         amount_to_pay,
         date,
         estimated_km,
@@ -275,7 +280,8 @@ export class TripController extends BaseController {
       // REGLA 3: Monto a pagar al chofer (actual_cost) - acepta tanto amount_to_pay como actual_cost
       const rawAmountToPay = amount_to_pay !== undefined ? amount_to_pay : actual_cost;
       const parsedActualCost = rawAmountToPay !== null && rawAmountToPay !== '' && rawAmountToPay !== undefined ? parseNumericField(rawAmountToPay) : null;
-      const parsedDistanceKm = parseNumericField(estimated_km);
+      const rawDistanceKm = distance_km !== undefined && distance_km !== null && distance_km !== '' ? distance_km : estimated_km;
+      const parsedDistanceKm = parseNumericField(rawDistanceKm);
       const parsedKmStart = parseNumericField(km_start);
       const parsedKmEnd = parseNumericField(km_end);
       const parsedLoadWeightTons = parseNumericField(load_weight_tons);
@@ -297,7 +303,7 @@ export class TripController extends BaseController {
       const parsedPerDiemsDelivered = per_diems_delivered === null || per_diems_delivered === '' ? null : (per_diems_delivered ?? null);
 
       const updatePayload: any = {
-        reference_number: bill_of_lading,
+        reference_number: reference_number !== undefined ? reference_number : bill_of_lading,
         origin,
         destination,
         driver_id,
