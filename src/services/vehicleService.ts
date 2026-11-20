@@ -1,6 +1,6 @@
 import { BaseService } from './baseService';
 import { ServiceResponse } from '../types/index';
-import { Prisma } from '@prisma/client';
+import { Prisma, Driver } from '@prisma/client';
 
 interface CreateVehicleInput {
   plate: string;
@@ -252,7 +252,7 @@ export class VehicleService extends BaseService {
         return this.createErrorResponse('Vehicle not found');
       }
 
-      const drivers = vehicle.drivers.map((dv) => dv.driver).filter(Boolean);
+      const drivers = vehicle.drivers.map((dv: any) => dv.driver).filter(Boolean) as Array<{ id: string; full_name: string | null; type: string; license_number: string | null; is_active: boolean }>;
 
       return this.createSuccessResponse(drivers, 'Vehicle drivers retrieved successfully');
     } catch (error) {

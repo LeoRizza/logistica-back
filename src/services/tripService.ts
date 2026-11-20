@@ -227,7 +227,10 @@ export class TripService extends BaseService {
     limit: number = 10,
     status?: string,
     driverId?: string,
-    clientId?: string
+    clientId?: string,
+    startDate?: string,
+    endDate?: string,
+    search?: string
   ): Promise<ServiceResponse<any>> {
     try {
       const { skip, take } = this.calculatePagination(page, limit);
@@ -238,6 +241,31 @@ export class TripService extends BaseService {
         ...(driverId ? { driver_id: driverId } : {}),
         ...(clientId ? { client_id: clientId } : {}),
       };
+
+      // Filtro de fechas (siempre sobre scheduled_date)
+      if (startDate || endDate) {
+        where.scheduled_date = {};
+        if (startDate) {
+          (where.scheduled_date as any).gte = new Date(`${startDate}T00:00:00.000Z`);
+        }
+        if (endDate) {
+          (where.scheduled_date as any).lte = new Date(`${endDate}T23:59:59.999Z`);
+        }
+      }
+
+      // Filtro de búsqueda (search) - MySQL no soporta mode: 'insensitive'
+      if (search && search.trim()) {
+        const term = search.trim();
+        where.OR = [
+          { reference_number: { contains: term } },
+          { origin: { contains: term } },
+          { destination: { contains: term } },
+          { ctg: { contains: term } },
+          { invoice_number: { contains: term } },
+          { driver: { full_name: { contains: term } } },
+          { vehicle: { plate: { contains: term } } },
+        ];
+      }
 
       const [trips, total] = await Promise.all([
         this.prisma.trip.findMany({
@@ -252,7 +280,7 @@ export class TripService extends BaseService {
             tripExpenses: { where: { deleted_at: null } },
             fuelLogs: { where: { deleted_at: null } },
           },
-          orderBy: { scheduled_date: 'desc' },
+          orderBy: [{ scheduled_date: 'desc' }, { created_at: 'desc' }],
         }),
         this.prisma.trip.count({ where }),
       ]);

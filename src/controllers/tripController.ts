@@ -144,9 +144,18 @@ export class TripController extends BaseController {
   async getTrips(req: AuthenticatedRequest, res: Response): Promise<void> {
     try {
       const { page, limit } = this.getPaginationParams(req);
-      const { status, driver_id, client_id } = req.query;
+      const { status, driver_id, client_id, startDate, endDate, search } = req.query;
 
-      const result = await this.tripService.getTrips(page, limit, status as string | undefined, driver_id as string | undefined, client_id as string | undefined);
+      const result = await this.tripService.getTrips(
+        page,
+        limit,
+        status as string | undefined,
+        driver_id as string | undefined,
+        client_id as string | undefined,
+        startDate as string | undefined,
+        endDate as string | undefined,
+        search as string | undefined
+      );
 
       if (!result.success) {
         this.sendError(res, result.message, 400, undefined, req);

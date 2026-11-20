@@ -13,6 +13,7 @@ import {
   UpdateSettlementInput,
 } from '../types/settlement';
 import { prisma } from '../config/database';
+import type { Trip, TripExpense, Settlement } from '@prisma/client';
 
 class SettlementService extends BaseService {
   /**
@@ -55,12 +56,12 @@ class SettlementService extends BaseService {
     });
 
     // Mapear viajes a TripSummary
-    const tripSummaries: TripSummary[] = trips.map((trip) => {
+    const tripSummaries: TripSummary[] = trips.map((trip: Trip & { tripExpenses: TripExpense[] }) => {
       const estimatedCost = trip.estimated_cost ?? 0;
       const actualCost = trip.actual_cost ?? 0;
       const perDiemsDelivered = trip.per_diems_delivered ?? 0;
       const tripExpensesTotal = trip.tripExpenses?.reduce(
-        (sum, expense) => sum + (expense.amount ?? 0),
+        (sum: number, expense: TripExpense) => sum + (expense.amount ?? 0),
         0
       ) ?? 0;
       const distanceKm = trip.distance_km ?? undefined;
@@ -82,21 +83,21 @@ class SettlementService extends BaseService {
     // Calcular totales
     // REGLA 3: El total ganado es la suma de actual_cost, no estimated_cost
     const total_amount_earned = trips.reduce(
-      (sum, trip) => sum + (trip.actual_cost ?? 0),
+      (sum: number, trip: Trip & { tripExpenses: TripExpense[] }) => sum + (trip.actual_cost ?? 0),
       0
     );
     const total_trip_expenses = trips.reduce(
-      (sum, trip) =>
+      (sum: number, trip: Trip & { tripExpenses: TripExpense[] }) =>
         sum +
         (trip.tripExpenses?.reduce(
-          (expenseSum, expense) => expenseSum + (expense.amount ?? 0),
+          (expenseSum: number, expense: TripExpense) => expenseSum + (expense.amount ?? 0),
           0
         ) ?? 0),
       0
     );
     const total_unforesee_expenses = total_trip_expenses;
     const total_per_diems_delivered = trips.reduce(
-      (sum, trip) => sum + (trip.per_diems_delivered ?? 0),
+      (sum: number, trip: Trip & { tripExpenses: TripExpense[] }) => sum + (trip.per_diems_delivered ?? 0),
       0
     );
 
@@ -198,7 +199,7 @@ class SettlementService extends BaseService {
     ]);
 
     return {
-      data: settlements.map((s) => this.formatSettlementDTO(s)),
+      data: settlements.map((s: Settlement) => this.formatSettlementDTO(s)),
       total,
       limit,
       offset,
@@ -264,7 +265,7 @@ class SettlementService extends BaseService {
     ]);
 
     return {
-      data: settlements.map((s) => this.formatSettlementDTO(s)),
+      data: settlements.map((s: Settlement) => this.formatSettlementDTO(s)),
       total,
       limit,
       offset,
@@ -308,7 +309,7 @@ class SettlementService extends BaseService {
    * @param settlement Settlement de Prisma
    * @returns SettlementDTO
    */
-  private formatSettlementDTO(settlement: any): SettlementDTO {
+  private formatSettlementDTO(settlement: Settlement): SettlementDTO {
     const startDate = settlement.start_date
       ? settlement.start_date.toISOString().split('T')[0]
       : '';
